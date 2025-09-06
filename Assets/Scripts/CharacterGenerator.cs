@@ -3,6 +3,7 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 using AYellowpaper.SerializedCollections;
+using Unity.VisualScripting;
 
 [RequireComponent(typeof(BoxCollider))]
 public class CharacterGenerator : MonoBehaviour
@@ -22,8 +23,7 @@ public class CharacterGenerator : MonoBehaviour
     [SerializeField] private GameObject dialogAnswerPrefab;
     [SerializeField] private GameObject buttonE;
     [SerializeField] private GameObject buttonF;
-    [SerializedDictionary("ItemID", "InventoryItem")]
-    [SerializeField] private SerializedDictionary<int, InventoryItem> items;
+    [SerializeField] private ItemsDatabase itemsDatabase;
 
     private BoxCollider _spawnArea;
     private int _sceneCount;
@@ -84,7 +84,7 @@ public class CharacterGenerator : MonoBehaviour
             dc.characterIcon = characterIcons[prefabIndex];
             dc.buttonE = buttonE;
             dc.buttonF = buttonF;
-            dc.items = items;
+            dc.itemsDatabase = itemsDatabase;
             spawned.transform.Find("Point").Find("Text").GetComponent<TMP_Text>().text = (i + 1).ToString();
         }
     }

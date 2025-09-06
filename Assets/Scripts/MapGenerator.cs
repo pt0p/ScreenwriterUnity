@@ -23,9 +23,9 @@ public class MapGenerator : MonoBehaviour
 
     void Awake()
     {
-        width = PlayerPrefs.GetInt("MapWidth", 9);
-        height = PlayerPrefs.GetInt("MapHeight", 7);
-        if (PlayerPrefs.GetInt("GameMode", 0) == 0) characterGenerator.size = new Vector3((width - 2) * cellSize, 2f, (height - 2) * cellSize);
+        width = PlayerPrefs.GetInt("MapWidth", 13);
+        height = PlayerPrefs.GetInt("MapHeight", 9);
+        if (PlayerPrefs.GetInt("GameMode", 1) == 0) characterGenerator.size = new Vector3((width - 2) * cellSize, 2f, (height - 2) * cellSize);
     }
 
     void Start()

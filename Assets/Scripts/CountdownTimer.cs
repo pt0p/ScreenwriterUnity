@@ -16,7 +16,7 @@ public class CountdownTimer : MonoBehaviour
 
     void Update()
     {
-        if (!inventoryManager.HasItem("Ключ-карта") || timeRemaining < 0 || SceneManager.GetActiveScene().name != "Horror")
+        if (inventoryManager.items.Count == 0 || timeRemaining < 0 || SceneManager.GetActiveScene().name != "Horror")
         {
             timerPanel.SetActive(false);
             return;

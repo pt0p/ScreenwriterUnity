@@ -8,7 +8,7 @@ using AYellowpaper.SerializedCollections;
 public class DialogController : MonoBehaviour
 {
     public int sceneId;
-    public bool DialogOpen { get; private set; } = false;
+    public bool DialogOpen = false;
 
     public GameObject dialogLayout;
     public GameObject dialogAnswerPanel;
@@ -19,8 +19,7 @@ public class DialogController : MonoBehaviour
     public GameObject dialogAnswerPrefab;
     public GameObject buttonE;
     public GameObject buttonF;
-    [SerializedDictionary("ItemID", "InventoryItem")]
-    public SerializedDictionary<int, InventoryItem> items;
+    public ItemsDatabase itemsDatabase;
 
     private InventoryManager inventoryManager;
     private List<MyScene> _scenes;
@@ -36,24 +35,11 @@ public class DialogController : MonoBehaviour
         inventoryManager = FindObjectOfType<InventoryManager>();
     }
 
-    private void Update()
+    private InventoryItem GetItemById(int id)
     {
-        if (Input.GetKeyDown(KeyCode.F) && dialogLayout.activeSelf)
-        {
-            buttonF.SetActive(false);
-            dialogLayout.SetActive(false);
-            buttonE.SetActive(true);
-            Cursor.lockState = CursorLockMode.Locked;
-            DialogOpen = false;
-
-            if (currentCoroutine != null)
-            {
-                StopCoroutine(currentCoroutine);
-                currentCoroutine = null;
-            }
-
-            foreach (Transform child in dialogAnswerPanel.transform) Destroy(child.gameObject);
-        }
+        if (itemsDatabase == null || itemsDatabase.items == null) return null;
+        if (id < 0 || id >= itemsDatabase.items.Count) return null;
+        return itemsDatabase.items[id];
     }
 
     private IEnumerator ShowWindow(int id, float delay)
@@ -122,25 +108,28 @@ public class DialogController : MonoBehaviour
 
         currentNode = _scenes[sceneId].data.Find(n => n.id == response.id);
         GoalAchieved goalAchieved = currentNode.goal_achieved;
-        if (goalAchieved.item != -1 && !inventoryManager.HasItem(items[goalAchieved.item].name))
+        if (goalAchieved.item != -1)
         {
-            if (parkourEvents != null) parkourEvents.ShowPart2();
-            else
+            InventoryItem item = GetItemById(goalAchieved.item);
+            if (item != null && !inventoryManager.HasItem(item.name))
             {
-                InventoryItem item = items[goalAchieved.item];
-                inventoryManager.AddItem(item);
-                inventoryManager.UpdateInventory();
-                if (SceneManager.GetActiveScene().name == "Horror")
+                if (parkourEvents != null) parkourEvents.ShowPart2();
+                else
                 {
-                    buttonF.SetActive(false);
-                    dialogLayout.SetActive(false);
-                    Cursor.lockState = CursorLockMode.Locked;
-                    if (currentCoroutine != null)
+                    inventoryManager.AddItem(item);
+                    inventoryManager.UpdateInventory();
+                    if (SceneManager.GetActiveScene().name == "Horror")
                     {
-                        StopCoroutine(currentCoroutine);
-                        currentCoroutine = null;
+                        buttonF.SetActive(false);
+                        dialogLayout.SetActive(false);
+                        Cursor.lockState = CursorLockMode.Locked;
+                        if (currentCoroutine != null)
+                        {
+                            StopCoroutine(currentCoroutine);
+                            currentCoroutine = null;
+                        }
+                        Destroy(gameObject);
                     }
-                    Destroy(gameObject);
                 }
             }
         }
@@ -155,8 +144,23 @@ public class DialogController : MonoBehaviour
 
     private void OnTriggerStay(Collider other)
     {
-        if (!other.CompareTag("Player") || DialogOpen) return;
-        if (Input.GetKey(KeyCode.E))
+        if (!other.CompareTag("Player")) return;
+        if (Input.GetKey(KeyCode.F) && dialogLayout.activeSelf)
+        {
+            buttonF.SetActive(false);
+            dialogLayout.SetActive(false);
+            buttonE.SetActive(true);
+            Cursor.lockState = CursorLockMode.Locked;
+            DialogOpen = false;
+            if (currentCoroutine != null)
+            {
+                StopCoroutine(currentCoroutine);
+                currentCoroutine = null;
+            }
+            foreach (Transform child in dialogAnswerPanel.transform) Destroy(child.gameObject);
+            return;
+        }
+        if (Input.GetKey(KeyCode.E) && !DialogOpen)
         {
             DialogOpen = true;
             buttonE.SetActive(false);

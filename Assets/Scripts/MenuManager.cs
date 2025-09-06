@@ -25,7 +25,7 @@ public class MenuManager : MonoBehaviour
         {
             if (Input.GetKeyDown(KeyCode.Escape) && !inventoryPanel.activeSelf && !mapPanel.activeSelf && !screamer.activeSelf) Pause(pausePanel);
             else if (Input.GetKeyDown(KeyCode.I) && !pausePanel.activeSelf && !mapPanel.activeSelf && !screamer.activeSelf) Pause(inventoryPanel);
-            else if (Input.GetKeyDown(KeyCode.M) && !pausePanel.activeSelf && !inventoryPanel.activeSelf && PlayerPrefs.GetInt("GameMode", 0) == 0 && !screamer.activeSelf) Pause(mapPanel);
+            else if (Input.GetKeyDown(KeyCode.M) && !pausePanel.activeSelf && !inventoryPanel.activeSelf && PlayerPrefs.GetInt("GameMode", 1) == 0 && !screamer.activeSelf) Pause(mapPanel);
         }
     }
 
@@ -40,7 +40,7 @@ public class MenuManager : MonoBehaviour
             audioSource.volume = panel.activeSelf ? volume : volume / 2;
         }
         panel.SetActive(!panel.activeSelf);
-        if (dialogLayout.activeSelf && dialogLayout.activeSelf) Cursor.lockState = CursorLockMode.None;
+        if (dialogLayout.activeSelf) Cursor.lockState = CursorLockMode.None;
     }
 
     public void LoadScene(int index)
@@ -51,7 +51,7 @@ public class MenuManager : MonoBehaviour
 
     public void SwitchMode()
     {
-        if (PlayerPrefs.GetInt("GameMode", 0) == 0) LoadScene(2);
+        if (PlayerPrefs.GetInt("GameMode", 1) == 0) LoadScene(2);
         else LoadScene(3);
     }
 }

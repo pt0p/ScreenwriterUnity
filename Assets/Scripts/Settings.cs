@@ -18,9 +18,9 @@ public class Settings : MonoBehaviour
             dialogField.text = File.ReadAllText(Application.dataPath + "/scene.json");
         else
             File.Create(Application.dataPath + "/scene.json").Close();
-        widthField.text = PlayerPrefs.GetInt("MapWidth", 9) + "";
-        heightField.text = PlayerPrefs.GetInt("MapHeight", 7) + "";
-        mode.value = PlayerPrefs.GetInt("GameMode", 0);
+        widthField.text = PlayerPrefs.GetInt("MapWidth", 13) + "";
+        heightField.text = PlayerPrefs.GetInt("MapHeight", 9) + "";
+        mode.value = PlayerPrefs.GetInt("GameMode", 1);
     }
 
     private void Update()

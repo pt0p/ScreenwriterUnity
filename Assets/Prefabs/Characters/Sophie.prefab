@@ -301,7 +301,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c196cd3bdb1bb8446b449987721fecd2, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  charId: 0
+  sceneId: 0
+  DialogOpen: 0
   dialogLayout: {fileID: 0}
   dialogAnswerPanel: {fileID: 0}
   characterPortrait: {fileID: 0}
@@ -311,7 +312,8 @@ MonoBehaviour:
   dialogAnswerPrefab: {fileID: 1004214735066442770, guid: bb9b58a4d32eb6c4e81a6b8a9bc72ae7, type: 3}
   buttonE: {fileID: 0}
   buttonF: {fileID: 0}
-  inventoryManager: {fileID: 0}
+  items:
+    _serializedList: []
 --- !u!135 &1297007577972471638
 SphereCollider:
   m_ObjectHideFlags: 0

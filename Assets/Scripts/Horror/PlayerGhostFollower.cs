@@ -49,7 +49,7 @@ public class PlayerGhostFollower : MonoBehaviour
 
     void Update()
     {
-        if (!inventoryManager.HasItem("Ключ-карта") || lanternController.isLit)
+        if (inventoryManager.items.Count == 0 || lanternController.isLit)
         {
             Disappear();
             return;
@@ -69,7 +69,7 @@ public class PlayerGhostFollower : MonoBehaviour
             yield return new WaitForSeconds(disappearInterval);
             Disappear();
             yield return new WaitForSeconds(reappearDelay);
-            if (inventoryManager.HasItem("Ключ-карта") && !lanternController.isLit) ghostScreamer.SetGhostActive(true);
+            if (inventoryManager.items.Count != 0 && !lanternController.isLit) ghostScreamer.SetGhostActive(true);
             else ghostScreamer.SetGhostActive(false);
         }
     }

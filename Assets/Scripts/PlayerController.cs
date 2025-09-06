@@ -6,14 +6,13 @@ public class PlayerController : MonoBehaviour
     [SerializeField] private float speed = 5f;
     [SerializeField] private float jumpForce = 5f;
     [SerializeField] private float gravity = 9.81f;
-    [SerializeField] private float walkSpeedMultiplier = 0.5f;
     [SerializeField] private float runSpeedMultiplier = 1.5f;
     [SerializeField] private float sensitivityX = 10f;
     [SerializeField] private float sensitivityY = 10f;
     [SerializeField] private float cameraLimit = 60f;
-    [SerializeField] private float deltaY = 1f;
     [SerializeField] private GameObject dialogLayout;
     [SerializeField] private GameObject screamer;
+    [SerializeField] private GameObject ghost;
     [SerializeField] private Camera cam;
     private Vector3 externalPlatformMotion = Vector3.zero;
     private Vector3 slidingForce = Vector3.zero;
@@ -35,17 +34,13 @@ public class PlayerController : MonoBehaviour
     private void Update()
     {
         float currentSpeed = speed;
-        if (Input.GetKey(KeyCode.LeftShift)) currentSpeed *= walkSpeedMultiplier;
-        else if (Input.GetKey(KeyCode.LeftControl)) currentSpeed *= runSpeedMultiplier;
+        if (Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.LeftShift)) currentSpeed *= runSpeedMultiplier;
 
         float horizontal = Input.GetAxis("Horizontal");
         float vertical = Input.GetAxis("Vertical");
         Vector3 forward = transform.forward * vertical;
         Vector3 right = transform.right * horizontal;
         Vector3 moveDirection = Vector3.Normalize(forward + right) * currentSpeed;
-
-        if (Input.GetKeyDown(KeyCode.LeftShift)) cam.transform.position = new Vector3(cam.transform.position.x, cam.transform.position.y - deltaY, cam.transform.position.z);
-        else if (Input.GetKeyUp(KeyCode.LeftShift)) cam.transform.position = new Vector3(cam.transform.position.x, cam.transform.position.y + deltaY, cam.transform.position.z);
 
         if (Cursor.lockState == CursorLockMode.Locked)
         {
@@ -78,13 +73,18 @@ public class PlayerController : MonoBehaviour
         if (other.CompareTag("LibEnter"))
         {
             siriusPosition = other.transform.position + new Vector3(0f, 0f, 3f);
-            if (inventoryManager.HasItem("Ключ-карта") && (countdownTimer.timeRemaining <= 0 || PlayerPrefs.GetInt("GameMode", 0) == 0))
+            if (inventoryManager.items.Count != 0 && (countdownTimer.timeRemaining <= 0 || PlayerPrefs.GetInt("GameMode", 1) == 0))
             {
+                if (ghost != null) ghost.SetActive(false);
                 Teleport(new Vector3(-503f, -499f, -499f));
                 other.transform.rotation = Quaternion.Euler(0f, 90f, 0f);
             }
         }
-        if (other.CompareTag("LibExit")) Teleport(siriusPosition);
+        if (other.CompareTag("LibExit"))
+        {
+            if (ghost != null) ghost.SetActive(true);
+            Teleport(siriusPosition);
+        }
     }
 
 

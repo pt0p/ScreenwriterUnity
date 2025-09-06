@@ -8,8 +8,7 @@ public class AnswersButtonController : MonoBehaviour
     {
         foreach (var dc in GameObject.FindObjectsOfType<DialogController>())
         {
-            if (dc.DialogOpen)
-                dc.ButtonClicked(btnIdx);
+            if (dc.DialogOpen) dc.ButtonClicked(btnIdx);
         }
     }
 }

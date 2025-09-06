@@ -1,6 +1,5 @@
 using UnityEngine;
 using UnityEngine.UI;
-using AYellowpaper.SerializedCollections;
 public class SingleCharacterSpawner : MonoBehaviour
 {
     [SerializeField] private GameObject[] characterPrefabs;
@@ -16,8 +15,7 @@ public class SingleCharacterSpawner : MonoBehaviour
     [SerializeField] private GameObject buttonF;
     [SerializeField] private int sceneId;
     [SerializeField] private bool onStart = true;
-    [SerializedDictionary("ItemID", "InventoryItem")]
-    [SerializeField] private SerializedDictionary<int, InventoryItem> items;
+    [SerializeField] private ItemsDatabase itemsDatabase;
 
     private void Start()
     {
@@ -40,6 +38,6 @@ public class SingleCharacterSpawner : MonoBehaviour
         dc.characterIcon = characterIcons[prefabIndex];
         dc.buttonE = buttonE;
         dc.buttonF = buttonF;
-        dc.items = items;
+        dc.itemsDatabase = itemsDatabase;
     }
 }
