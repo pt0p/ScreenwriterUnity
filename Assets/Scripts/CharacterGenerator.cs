@@ -2,8 +2,6 @@ using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
-using AYellowpaper.SerializedCollections;
-using Unity.VisualScripting;
 
 [RequireComponent(typeof(BoxCollider))]
 public class CharacterGenerator : MonoBehaviour
