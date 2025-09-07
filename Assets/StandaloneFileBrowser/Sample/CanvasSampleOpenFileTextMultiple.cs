@@ -61,7 +61,7 @@ public class CanvasSampleOpenFileTextMultiple : MonoBehaviour, IPointerDownHandl
                 yield return request.SendWebRequest();
                 if (request.result == UnityWebRequest.Result.ConnectionError || request.result == UnityWebRequest.Result.ProtocolError)
                 {
-                    Debug.LogError($"Ошибка загрузки {urlArr[i]}: {request.error}");
+                    Debug.LogError($"РћС€РёР±РєР° Р·Р°РіСЂСѓР·РєРё {urlArr[i]}: {request.error}");
                 }
                 else outputText += request.downloadHandler.text;
             }
