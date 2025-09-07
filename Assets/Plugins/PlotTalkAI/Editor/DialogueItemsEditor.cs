@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using Newtonsoft.Json.Linq;
+using Plugins.PlotTalkAI.Utils;
 using UnityEditor;
 using UnityEngine;
 
@@ -42,11 +44,11 @@ public class DialogueItemsEditor : EditorWindow
         }
         if (database.items.Count == 0)
         {
-            CreateInventoryItem("Ключ-карта", "Ключ-карта Сириуса", "keycard_sirius");
-            CreateInventoryItem("Конспект", "Конспект лекции А. В. Гасникова \"Минимизация эмпирического риска\"", "conspects_sirius");
-            CreateInventoryItem("Мерч", "Мерч Сириуса", "tshirt_sirius");
-            CreateInventoryItem("Закрытый ноутбук", "Коллеги, просим вас немедлено закрыть ноутбуки!", "laptop_sirius");
-            CreateInventoryItem("Бейджик", "Бейджик участника июльской программы Большие вызовы", "id_card_sirius");
+            CreateInventoryItem("РљР»СЋС‡-РєР°СЂС‚Р°", "РљР»СЋС‡-РєР°СЂС‚Р° РЎРёСЂРёСѓСЃР°", "keycard_sirius");
+            CreateInventoryItem("РљРѕРЅСЃРїРµРєС‚", "РљРѕРЅСЃРїРµРєС‚ Р»РµРєС†РёРё Рђ. Р’. Р“Р°СЃРЅРёРєРѕРІР° \"РњРёРЅРёРјРёР·Р°С†РёСЏ СЌРјРїРёСЂРёС‡РµСЃРєРѕРіРѕ СЂРёСЃРєР°\"", "conspects_sirius");
+            CreateInventoryItem("РњРµСЂС‡", "РњРµСЂС‡ РЎРёСЂРёСѓСЃР°", "tshirt_sirius");
+            CreateInventoryItem("Р—Р°РєСЂС‹С‚С‹Р№ РЅРѕСѓС‚Р±СѓРє", "РљРѕР»Р»РµРіРё, РїСЂРѕСЃРёРј РІР°СЃ РЅРµРјРµРґР»РµРЅРѕ Р·Р°РєСЂС‹С‚СЊ РЅРѕСѓС‚Р±СѓРєРё!", "laptop_sirius");
+            CreateInventoryItem("Р‘РµР№РґР¶РёРє", "Р‘РµР№РґР¶РёРє СѓС‡Р°СЃС‚РЅРёРєР° РёСЋР»СЊСЃРєРѕР№ РїСЂРѕРіСЂР°РјРјС‹ Р‘РѕР»СЊС€РёРµ РІС‹Р·РѕРІС‹", "id_card_sirius");
             SaveDatabase();
         }
     }
@@ -144,8 +146,8 @@ public class DialogueItemsEditor : EditorWindow
                 fontSize = 14,
                 alignment = TextAnchor.MiddleCenter,
             };
-            GUILayout.Label("Таблица предметов", headerLabelStyle);
-            if (GUILayout.Button("Добавить предмет", GUILayout.Width(120))) CreateInventoryItem("Новый предмет", "Описание", "");
+            GUILayout.Label("РўР°Р±Р»РёС†Р° РїСЂРµРґРјРµС‚РѕРІ", headerLabelStyle);
+            if (GUILayout.Button("Р”РѕР±Р°РІРёС‚СЊ РїСЂРµРґРјРµС‚", GUILayout.Width(120))) CreateInventoryItem("РќРѕРІС‹Р№ РїСЂРµРґРјРµС‚", "РћРїРёСЃР°РЅРёРµ", "");
         }
         GUILayout.EndHorizontal();
         EditorGUILayout.Space(5);
@@ -177,10 +179,10 @@ public class DialogueItemsEditor : EditorWindow
             string header = i switch
             {
                 0 => "ID",
-                1 => "Название",
-                2 => "Описание",
-                3 => "Иконка",
-                4 => "Действия",
+                1 => "РќР°Р·РІР°РЅРёРµ",
+                2 => "РћРїРёСЃР°РЅРёРµ",
+                3 => "РРєРѕРЅРєР°",
+                4 => "Р”РµР№СЃС‚РІРёСЏ",
                 _ => ""
             };
             Rect headerRect = new Rect(startX + 1, 0, columnWidths[i] + i + 1, headerRowHeight);
@@ -245,7 +247,7 @@ public class DialogueItemsEditor : EditorWindow
             Rect deleteRect = new Rect(columnWidths[0] + columnWidths[1] + columnWidths[2] + columnWidths[3] + 9,
                 currentY + (rowHeight - 24) / 2, columnWidths[4] - 10, 24
             );
-            if (GUI.Button(deleteRect, "Удалить"))
+            if (GUI.Button(deleteRect, "РЈРґР°Р»РёС‚СЊ"))
             {
                 predefinedItems.RemoveAt(row);
                 SaveDatabase();
@@ -288,8 +290,8 @@ public class DialogueItemsEditor : EditorWindow
             float spacing = 6f;
             Rect okButtonRect = new Rect(textAreaRect.x + textAreaRect.width + spacing, textAreaRect.y, buttonWidth, buttonHeight);
             Rect cancelButtonRect = new Rect(okButtonRect.x, okButtonRect.y + buttonHeight + spacing, buttonWidth, buttonHeight);
-            if (GUI.Button(okButtonRect, "Сохранить")) ApplyEditing();
-            if (GUI.Button(cancelButtonRect, "Отмена")) CancelEditing();
+            if (GUI.Button(okButtonRect, "РЎРѕС…СЂР°РЅРёС‚СЊ")) ApplyEditing();
+            if (GUI.Button(cancelButtonRect, "РћС‚РјРµРЅР°")) CancelEditing();
         }
 
         GUI.EndScrollView();
