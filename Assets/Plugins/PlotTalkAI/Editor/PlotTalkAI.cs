@@ -21,6 +21,11 @@ public class PlotTalkAI : EditorWindow
     private string registerEmail = "";
     private string registerPassword = "";
     private string registerConfirm = "";
+    private string editGameName;
+    private string editGameDescription;
+    private int editGameGenre;
+    private int editGameTechLevel;
+    private int editGameTonality;
 
     // Кэшированные стили
     private GUIStyle linkStyle;
@@ -36,8 +41,11 @@ public class PlotTalkAI : EditorWindow
     private GUIStyle plusLabelStyle;
 
     private bool isHoveringLink = false;
-    private bool isHoveringButton = false;
     private Vector2 scrollPosition;
+    
+    private string[] gameGenres = {"Приключения", "Фэнтези", "Детектив", "Драма", "Комедия", "Ужасы", "Стратегия"};
+    private string[] gameTechLevels = {"Каменный век", "Средневековье", "Индустриальный", "Современность", "Будущее", "Другое"};
+    private string[] gameTonalities = {"Нейтральная", "Героическая", "Трагическая", "Комическая", "Сказочная"};
 
     // Данные для демонстрации
     private List<GameData> games = new List<GameData>();
@@ -196,7 +204,6 @@ public class PlotTalkAI : EditorWindow
             isHoveringLink ? MouseCursor.Link : MouseCursor.Arrow);
 
         isHoveringLink = false;
-        isHoveringButton = false;
     }
 
     private void CreateStyles()
@@ -251,7 +258,7 @@ public class PlotTalkAI : EditorWindow
             margin = new RectOffset(5, 5, 10, 10),
             padding = new RectOffset(15, 15, 15, 15)
         };
-        
+
         addCardStyle = new GUIStyle(EditorStyles.helpBox)
         {
             margin = new RectOffset(5, 5, 10, 10),
@@ -330,12 +337,6 @@ public class PlotTalkAI : EditorWindow
             }
         }
 
-        // Проверяем наведение на кнопку
-        if (buttonRect.Contains(Event.current.mousePosition))
-        {
-            isHoveringButton = true;
-        }
-
         GUILayout.Space(20);
 
         // Проверяем наведение на ссылку
@@ -394,12 +395,6 @@ public class PlotTalkAI : EditorWindow
             }
         }
 
-        // Проверяем наведение на кнопку
-        if (buttonRect.Contains(Event.current.mousePosition))
-        {
-            isHoveringButton = true;
-        }
-
         GUILayout.Space(20);
 
         // Проверяем наведение на ссылку
@@ -421,23 +416,23 @@ public class PlotTalkAI : EditorWindow
     {
         GUILayout.Label($"Добро пожаловать, ТутБудетИмя!", centeredLabelStyle);
         GUILayout.Space(30);
-    
+
         // Рассчитываем доступную ширину с учетом полосы прокрутки
         float availableWidth = position.width - 40;
         int columns = Mathf.Max(1, Mathf.FloorToInt(availableWidth / 220));
         float cardWidth = (availableWidth - (columns - 1) * 20 - 70) / columns; // Вычитаем ширину полосы прокрутки
-    
-        scrollPosition = GUILayout.BeginScrollView(scrollPosition, false, false, 
+
+        scrollPosition = GUILayout.BeginScrollView(scrollPosition, false, false,
             GUIStyle.none, GUI.skin.verticalScrollbar, GUILayout.ExpandWidth(true));
-    
+
         int cardCount = games.Count + 1;
-    
+
         // Создаем сетку карточек
         for (int i = 0; i < cardCount; i += columns)
         {
             GUILayout.BeginHorizontal();
             GUILayout.Space(0); // Убираем любые отступы по умолчанию
-        
+
             for (int j = 0; j < columns; j++)
             {
                 int index = i + j;
@@ -447,28 +442,28 @@ public class PlotTalkAI : EditorWindow
 
                 if (index == 0)
                 {
-                    DrawCreateGameCard(cardWidth+7, 120);
+                    DrawCreateGameCard(cardWidth + 7, 120);
                 }
                 else if (index - 1 < games.Count)
                 {
                     DrawGameCard(games[index - 1], cardWidth, 120);
                 }
             }
-        
+
             // Заполняем оставшееся пространство
             GUILayout.FlexibleSpace();
             GUILayout.EndHorizontal();
-        
+
             if (i + columns < cardCount)
             {
                 GUILayout.Space(20);
             }
         }
-    
+
         GUILayout.EndScrollView();
-    
+
         GUILayout.Space(20);
-    
+
         // Кнопка "Выйти"
         Rect buttonRect = GUILayoutUtility.GetRect(GUIContent.none, buttonStyle, GUILayout.Height(35));
         if (GUI.Button(buttonRect, "Выйти", buttonStyle))
@@ -478,102 +473,107 @@ public class PlotTalkAI : EditorWindow
             loginEmail = "";
             loginPassword = "";
         }
-    
-        if (buttonRect.Contains(Event.current.mousePosition))
+    }
+
+    private float EstimateCardHeight(GameData game, float width)
+    {
+        // Оцениваем высоту карточки на основе содержимого
+        float height = 60; // Минимальная высота (заголовок и отступы)
+
+        // Добавляем высоту для описания (примерно 2 строки)
+        height += 40;
+
+        // Добавляем высоту для кнопок
+        height += 40;
+
+        return height;
+    }
+
+    private void DrawCreateGameCard(float width, float height)
+    {
+        GUILayout.BeginVertical(addCardStyle, GUILayout.Width(width), GUILayout.Height(height));
+
+        // Центрируем содержимое по вертикали
+        GUILayout.FlexibleSpace();
+
+        // Большой плюс
+        GUILayout.Label("+", plusStyle, GUILayout.Height(50));
+
+        GUILayout.Space(10);
+
+        // Подпись
+        GUILayout.Label("Создать игру", plusLabelStyle);
+
+        GUILayout.FlexibleSpace();
+        GUILayout.EndVertical();
+
+        // Обработка клика по карточке
+        Rect cardRect = GUILayoutUtility.GetLastRect();
+        if (Event.current.type == EventType.MouseDown && cardRect.Contains(Event.current.mousePosition))
         {
-            isHoveringButton = true;
+            CreateNewGame();
+            Event.current.Use();
+        }
+
+        // Изменяем курсор при наведении
+        if (cardRect.Contains(Event.current.mousePosition))
+        {
+            EditorGUIUtility.AddCursorRect(cardRect, MouseCursor.Link);
+            isHoveringLink = true;
         }
     }
 
-private float EstimateCardHeight(GameData game, float width)
-{
-    // Оцениваем высоту карточки на основе содержимого
-    float height = 60; // Минимальная высота (заголовок и отступы)
-    
-    // Добавляем высоту для описания (примерно 2 строки)
-    height += 40;
-    
-    // Добавляем высоту для кнопок
-    height += 40;
-    
-    return height;
-}
+    private void DrawGameCard(GameData game, float width, float height)
+    {
+        GUILayout.BeginVertical(cardStyle, GUILayout.Width(width), GUILayout.Height(height));
 
-private void DrawCreateGameCard(float width, float height)
-{
-    GUILayout.BeginVertical(addCardStyle, GUILayout.Width(width), GUILayout.Height(height));
-    
-    // Центрируем содержимое по вертикали
-    GUILayout.FlexibleSpace();
-    
-    // Большой плюс
-    GUILayout.Label("+", plusStyle, GUILayout.Height(50));
-    
-    GUILayout.Space(10);
-    
-    // Подпись
-    GUILayout.Label("Создать игру", plusLabelStyle);
-    
-    GUILayout.FlexibleSpace();
-    GUILayout.EndVertical();
-    
-    // Обработка клика по карточке
-    Rect cardRect = GUILayoutUtility.GetLastRect();
-    if (Event.current.type == EventType.MouseDown && cardRect.Contains(Event.current.mousePosition))
-    {
-        CreateNewGame();
-        Event.current.Use();
-    }
-    
-    // Изменяем курсор при наведении
-    if (cardRect.Contains(Event.current.mousePosition))
-    {
-        EditorGUIUtility.AddCursorRect(cardRect, MouseCursor.Link);
-        isHoveringLink = true;
-    }
-}
+        // Заголовок игры
+        GUILayout.Label(game.title, cardTitleStyle);
 
-private void DrawGameCard(GameData game, float width, float height)
-{
-    GUILayout.BeginVertical(cardStyle, GUILayout.Width(width), GUILayout.Height(height));
-    
-    // Заголовок игры
-    GUILayout.Label(game.title, cardTitleStyle);
-    
-    // Описание игры с ограничением по высоте
-    float descriptionHeight = height - 100; // Вычитаем высоту заголовка и кнопок
-    Rect descriptionRect = GUILayoutUtility.GetRect(width - 30, descriptionHeight, EditorStyles.wordWrappedLabel);
-    GUI.Label(descriptionRect, game.description, EditorStyles.wordWrappedLabel);
-    
-    GUILayout.FlexibleSpace();
-    
-    // Кнопки управления
-    GUILayout.BeginHorizontal();
-    
-    // Кнопка перехода к игре
-    if (GUILayout.Button("Открыть", GUILayout.Height(30)))
-    {
-        selectedGame = game;
-        SwitchPage(Page.GameDetail);
-    }
-    
-    GUILayout.Space(5);
-    
-    // Кнопка настроек игры
-    if (GUILayout.Button(EditorGUIUtility.IconContent("Settings"), iconButtonStyle))
-    {
-        Debug.Log($"Настройки игры: {game.title}");
-    }
-    
-    GUILayout.EndHorizontal();
-    GUILayout.EndVertical();
-} 
+        // Описание игры с ограничением по высоте
+        float descriptionHeight = height - 100; // Вычитаем высоту заголовка и кнопок
+        Rect descriptionRect = GUILayoutUtility.GetRect(width - 30, descriptionHeight, EditorStyles.wordWrappedLabel);
+        GUI.Label(descriptionRect, game.description, EditorStyles.wordWrappedLabel);
 
-private void CreateNewGame()
-{
-    SwitchPage(Page.EditGame);
-    selectedGame = null;
-}
+        GUILayout.FlexibleSpace();
+
+        // Кнопки управления
+        GUILayout.BeginHorizontal();
+
+        // Кнопка перехода к игре
+        if (GUILayout.Button("Открыть", GUILayout.Height(30)))
+        {
+            selectedGame = game;
+            SwitchPage(Page.GameDetail);
+        }
+
+        GUILayout.Space(5);
+
+        // Кнопка настроек игры
+        if (GUILayout.Button(EditorGUIUtility.IconContent("Settings"), iconButtonStyle))
+        {
+            selectedGame = game;
+            SwitchPage(Page.EditGame);
+        }
+        if (GUILayout.Button("X", iconButtonStyle, GUILayout.Height(30)))
+        {
+            if (EditorUtility.DisplayDialog("Вы уверены?",
+                    "Это действие необратимо. После того, как вы нажмете на кнопку \"OK\", игра будет безвозвратно удалена.",
+                    "OK", "Отмена"))
+            {
+                Debug.Log($"Удаление игры: {game.title}");
+            }
+        }
+
+        GUILayout.EndHorizontal();
+        GUILayout.EndVertical();
+    }
+
+    private void CreateNewGame()
+    {
+        SwitchPage(Page.EditGame);
+        selectedGame = null;
+    }
 
     private void DrawGameDetailPage()
     {
@@ -610,58 +610,110 @@ private void CreateNewGame()
     }
 
     private void DrawEditGamePage()
+{
+    GUILayout.BeginArea(new Rect(
+        (position.width - Mathf.Min(400, position.width - 40)) / 2,
+        20,
+        Mathf.Min(400, position.width * 0.8f),
+        position.height - 40
+    ));
+    
+    GUILayout.BeginVertical();
+    GUILayout.Label("Игра", centeredLabelStyle);
+    GUILayout.Space(30);
+    
+    // Рассчитываем доступную высоту для ScrollView
+    float availableHeight = CalculateAvailableHeight(); // 120 - примерная высота заголовка и кнопок
+    
+    // Начинаем ScrollView с фиксированной высотой
+    scrollPosition = GUILayout.BeginScrollView(scrollPosition, false, false, 
+        GUIStyle.none, GUI.skin.verticalScrollbar, 
+        GUILayout.Height(availableHeight));
+    
+    GUILayout.Label("Название", fieldLabelStyle);
+    editGameName = EditorGUILayout.TextField(editGameName, textFieldStyle);
+
+    GUILayout.Space(15);
+
+    GUILayout.Label("Характеристики мира", fieldLabelStyle);
+    editGameDescription = EditorGUILayout.TextArea(editGameDescription, 
+        GUILayout.Height(60)); // Фиксированная высота для текстового поля
+
+    GUILayout.Label("Жанр", fieldLabelStyle);
+    editGameGenre = EditorGUILayout.Popup(editGameGenre, gameGenres, textFieldStyle);
+    
+    GUILayout.Space(15);
+    
+    GUILayout.Label("Исторический период", fieldLabelStyle);
+    editGameTechLevel = EditorGUILayout.Popup(editGameTechLevel, gameTechLevels, textFieldStyle);
+    
+    GUILayout.Space(15);
+    
+    GUILayout.Label("Тональность", fieldLabelStyle);
+    editGameTonality = EditorGUILayout.Popup(editGameTonality, gameTonalities, textFieldStyle);
+
+    GUILayout.Space(15);
+    
+    GUILayout.EndScrollView();
+    
+    // Кнопки вне ScrollView, чтобы они всегда были видны
+    GUILayout.Space(15);
+    
+    if (GUILayout.Button("Изменить персонажей", buttonStyle, GUILayout.Height(40)))
     {
-        GUILayout.BeginArea(new Rect(
-            (position.width - Mathf.Min(400, position.width - 40)) / 2,
-            20,
-            Mathf.Min(400, position.width * 0.8f),
-            position.height - 40
-        ));
-        GUILayout.BeginVertical();
-        GUILayout.Label("Игра", centeredLabelStyle);
-        
-        
-        GUILayout.Space(30);
-
-        GUILayout.Label("Email", fieldLabelStyle);
-        loginEmail = EditorGUILayout.TextField(loginEmail, textFieldStyle);
-
-        GUILayout.Space(15);
-
-        GUILayout.Label("Пароль", fieldLabelStyle);
-        loginPassword = EditorGUILayout.PasswordField(loginPassword, textFieldStyle);
-
-        GUILayout.Space(25);
-
-        // Кнопка "Войти"
-        Rect buttonRect = GUILayoutUtility.GetRect(GUIContent.none, buttonStyle, GUILayout.Height(40));
-        if (GUI.Button(buttonRect, "Войти", buttonStyle))
+        // Ваш код для перехода к редактированию персонажей
+    }
+    
+    GUILayout.Space(5);
+    
+    if (GUILayout.Button("Сохранить", buttonStyle, GUILayout.Height(40)))
+    {
+        if (!string.IsNullOrEmpty(loginEmail) && loginPassword == "1234")
         {
-            if (!string.IsNullOrEmpty(loginEmail) && loginPassword == "1234")
-            {
-                StorageApi.GetInstance().LogIn(0, "token_will_be_here", "{\"games\":[]}");
-                SwitchPage(Page.Main);
-            }
-            else
-            {
-                EditorUtility.DisplayDialog("Ошибка", "Неверные данные", "OK");
-            }
+            StorageApi.GetInstance().LogIn(0, "token_will_be_here", "{\"games\":[]}");
+            SwitchPage(Page.Main);
         }
-
-        // Проверяем наведение на кнопку
-        if (buttonRect.Contains(Event.current.mousePosition))
+        else
         {
-            isHoveringButton = true;
+            EditorUtility.DisplayDialog("Ошибка", "Неверные данные", "OK");
         }
+    }
+    
+    GUILayout.Space(5);
+    
+    if (GUILayout.Button("Отменить", buttonStyle, GUILayout.Height(40)))
+    {
+        if (EditorUtility.DisplayDialog("Вы уверены?",
+                "После того, как вы нажмете на кнопку \"Да\", все внесенные изменения сбросятся.",
+                "Да", "Отмена"))
+        {
+            selectedGame = null;
+            SwitchPage(Page.Main);
+        }
+    }
 
-        GUILayout.Space(20);
-        GUILayout.EndVertical();
-        GUILayout.EndArea();
+    GUILayout.EndVertical();
+    GUILayout.EndArea();
+}
+    
+    private float CalculateAvailableHeight()
+    {
+        // Базовые отступы
+        float basePadding = 40f;
+    
+        // Высота заголовка и отступов
+        float headerHeight = 50f + 30f;
+    
+        // Высота кнопок (3 кнопки по 40 + отступы)
+        float buttonsHeight = 3 * 40f + 2 * 5f + 20f;
+    
+        return position.height - basePadding - headerHeight - buttonsHeight;
     }
 
     public void SwitchPage(Page page)
     {
         previousPage = currentPage;
+        scrollPosition = Vector2.zero;
         bool loggedIn = StorageApi.GetInstance().IsLoggedIn();
         if (page is Page.Register or Page.Login)
         {
