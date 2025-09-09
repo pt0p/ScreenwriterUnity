@@ -321,7 +321,7 @@ namespace Plugins.PlotTalkAI.Utils
         }
 
         // Вспомогательные методы
-        private JObject LoadFullJson()
+        public JObject LoadFullJson()
         {
             return Deserialize(GetDataString());
         }
@@ -331,31 +331,31 @@ namespace Plugins.PlotTalkAI.Utils
             SetDataString(Serialize(json));
         }
 
-        private JArray GetGamesArray(JObject fullJson)
+        public JArray GetGamesArray(JObject fullJson)
         {
             return fullJson["user"]["data"]["games"] as JArray ?? new JArray();
         }
 
-        private JObject GetGameById(string gameId)
+        public JObject GetGameById(string gameId)
         {
             JObject fullJson = LoadFullJson();
             JArray games = GetGamesArray(fullJson);
             return games.FirstOrDefault(g => g["id"]?.ToString() == gameId) as JObject;
         }
 
-        private JArray GetScenesArray(JObject game)
+        public JArray GetScenesArray(JObject game)
         {
             return game["scenes"] as JArray ?? new JArray();
         }
 
-        private JObject GetSceneById(string gameId, long sceneId)
+        public JObject GetSceneById(string gameId, long sceneId)
         {
             JObject game = GetGameById(gameId);
             JArray scenes = GetScenesArray(game);
             return scenes.FirstOrDefault(s => (long)s["id"] == sceneId) as JObject;
         }
 
-        private JArray GetScriptsArray(JObject scene)
+        public JArray GetScriptsArray(JObject scene)
         {
             return scene["scripts"] as JArray ?? new JArray();
         }

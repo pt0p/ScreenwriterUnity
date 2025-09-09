@@ -1,7 +1,9 @@
+using System;
 using Plugins.PlotTalkAI.Utils;
 using UnityEditor;
 using UnityEngine;
 using System.Collections.Generic;
+using Newtonsoft.Json.Linq;
 
 public class PlotTalkAI : EditorWindow
 {
@@ -46,26 +48,10 @@ public class PlotTalkAI : EditorWindow
     private string[] gameGenres = {"Приключения", "Фэнтези", "Детектив", "Драма", "Комедия", "Ужасы", "Стратегия"};
     private string[] gameTechLevels = {"Каменный век", "Средневековье", "Индустриальный", "Современность", "Будущее", "Другое"};
     private string[] gameTonalities = {"Нейтральная", "Героическая", "Трагическая", "Комическая", "Сказочная"};
-
-    // Данные для демонстрации
-    private List<GameData> games = new List<GameData>();
-    private GameData selectedGame;
-
-    [System.Serializable]
-    private class GameData
-    {
-        public string id;
-        public string title;
-        public string description;
-        public List<CharacterData> characters;
-    }
-
-    [System.Serializable]
-    private class CharacterData
-    {
-        public string name;
-        public string role;
-    }
+    
+    private JObject selectedGame;
+    
+    private bool pageInitialized;
 
     [MenuItem("Window/PlotTalkAI")]
     public static void ShowWindow()
@@ -77,86 +63,6 @@ public class PlotTalkAI : EditorWindow
     {
         SwitchPage(currentPage);
         CreateStyles();
-
-        // Заглушка с демо-данными
-        games.Add(new GameData
-        {
-            id = "1",
-            title = "Ролевая игра",
-            description = "Приключенческая RPG в фэнтезийном мире",
-            characters = new List<CharacterData>
-            {
-                new CharacterData { name = "Элрик", role = "Воин" },
-                new CharacterData { name = "Лиана", role = "Маг" }
-            }
-        });
-
-        games.Add(new GameData
-        {
-            id = "2",
-            title = "Космическая одиссея",
-            description = "Исследуйте галактику в поисках новых миров",
-            characters = new List<CharacterData>
-            {
-                new CharacterData { name = "Кэптен Нова", role = "Капитан" },
-                new CharacterData { name = "R2-X2", role = "Механик" }
-            }
-        });
-        games.Add(new GameData
-        {
-            id = "2",
-            title = "Космическая одиссея",
-            description = "Исследуйте галактику в поисках новых миров",
-            characters = new List<CharacterData>
-            {
-                new CharacterData { name = "Кэптен Нова", role = "Капитан" },
-                new CharacterData { name = "R2-X2", role = "Механик" }
-            }
-        });
-        games.Add(new GameData
-        {
-            id = "2",
-            title = "Космическая одиссея",
-            description = "Исследуйте галактику в поисках новых миров",
-            characters = new List<CharacterData>
-            {
-                new CharacterData { name = "Кэптен Нова", role = "Капитан" },
-                new CharacterData { name = "R2-X2", role = "Механик" }
-            }
-        });
-        games.Add(new GameData
-        {
-            id = "2",
-            title = "Космическая одиссея",
-            description = "Исследуйте галактику в поисках новых миров",
-            characters = new List<CharacterData>
-            {
-                new CharacterData { name = "Кэптен Нова", role = "Капитан" },
-                new CharacterData { name = "R2-X2", role = "Механик" }
-            }
-        });
-        games.Add(new GameData
-        {
-            id = "2",
-            title = "Космическая одиссея",
-            description = "Исследуйте галактику в поисках новых миров",
-            characters = new List<CharacterData>
-            {
-                new CharacterData { name = "Кэптен Нова", role = "Капитан" },
-                new CharacterData { name = "R2-X2", role = "Механик" }
-            }
-        });
-        games.Add(new GameData
-        {
-            id = "2",
-            title = "Космическая одиссея",
-            description = "Исследуйте галактику в поисках новых миров",
-            characters = new List<CharacterData>
-            {
-                new CharacterData { name = "Кэптен Нова", role = "Капитан" },
-                new CharacterData { name = "R2-X2", role = "Механик" }
-            }
-        });
     }
 
     private void OnGUI()
@@ -414,6 +320,7 @@ public class PlotTalkAI : EditorWindow
 
     private void DrawMainPage()
     {
+        var games = StorageApi.GetInstance().GetGamesArray(StorageApi.GetInstance().LoadFullJson());
         GUILayout.Label($"Добро пожаловать, ТутБудетИмя!", centeredLabelStyle);
         GUILayout.Space(30);
 
@@ -446,7 +353,7 @@ public class PlotTalkAI : EditorWindow
                 }
                 else if (index - 1 < games.Count)
                 {
-                    DrawGameCard(games[index - 1], cardWidth, 120);
+                    DrawGameCard((JObject)games[index - 1], cardWidth, 120);
                 }
             }
 
@@ -473,20 +380,6 @@ public class PlotTalkAI : EditorWindow
             loginEmail = "";
             loginPassword = "";
         }
-    }
-
-    private float EstimateCardHeight(GameData game, float width)
-    {
-        // Оцениваем высоту карточки на основе содержимого
-        float height = 60; // Минимальная высота (заголовок и отступы)
-
-        // Добавляем высоту для описания (примерно 2 строки)
-        height += 40;
-
-        // Добавляем высоту для кнопок
-        height += 40;
-
-        return height;
     }
 
     private void DrawCreateGameCard(float width, float height)
@@ -523,17 +416,17 @@ public class PlotTalkAI : EditorWindow
         }
     }
 
-    private void DrawGameCard(GameData game, float width, float height)
+    private void DrawGameCard(JObject game, float width, float height)
     {
         GUILayout.BeginVertical(cardStyle, GUILayout.Width(width), GUILayout.Height(height));
 
         // Заголовок игры
-        GUILayout.Label(game.title, cardTitleStyle);
+        GUILayout.Label((string)game["name"], cardTitleStyle);
 
         // Описание игры с ограничением по высоте
         float descriptionHeight = height - 100; // Вычитаем высоту заголовка и кнопок
         Rect descriptionRect = GUILayoutUtility.GetRect(width - 30, descriptionHeight, EditorStyles.wordWrappedLabel);
-        GUI.Label(descriptionRect, game.description, EditorStyles.wordWrappedLabel);
+        GUI.Label(descriptionRect, (string)game["description"], EditorStyles.wordWrappedLabel);
 
         GUILayout.FlexibleSpace();
 
@@ -561,7 +454,7 @@ public class PlotTalkAI : EditorWindow
                     "Это действие необратимо. После того, как вы нажмете на кнопку \"OK\", игра будет безвозвратно удалена.",
                     "OK", "Отмена"))
             {
-                Debug.Log($"Удаление игры: {game.title}");
+                Debug.Log($"Удаление игры");
             }
         }
 
@@ -583,20 +476,20 @@ public class PlotTalkAI : EditorWindow
             return;
         }
 
-        GUILayout.Label(selectedGame.title, centeredLabelStyle);
+        GUILayout.Label((string)selectedGame["title"], centeredLabelStyle);
         GUILayout.Space(20);
 
         GUILayout.Label("Описание:", EditorStyles.boldLabel);
-        GUILayout.Label(selectedGame.description, EditorStyles.wordWrappedLabel);
+        GUILayout.Label((string)selectedGame["description"], EditorStyles.wordWrappedLabel);
 
         GUILayout.Space(20);
 
         GUILayout.Label("Персонажи:", EditorStyles.boldLabel);
 
-        foreach (var character in selectedGame.characters)
+        foreach (var character in selectedGame["characters"])
         {
             GUILayout.BeginHorizontal(EditorStyles.helpBox);
-            GUILayout.Label($"• {character.name} ({character.role})");
+            GUILayout.Label("• " + (string)character["name"] + " ("+ (string)character["role"] + ")");
             GUILayout.EndHorizontal();
         }
 
@@ -611,6 +504,28 @@ public class PlotTalkAI : EditorWindow
 
     private void DrawEditGamePage()
 {
+    if (!pageInitialized)
+    {
+        if (selectedGame != null)
+        {
+            editGameName = (string)selectedGame["name"];
+            editGameDescription = (string)selectedGame["description"];
+            editGameGenre = Array.IndexOf(gameGenres, (string)selectedGame["genre"]);
+            editGameTonality = Array.IndexOf(gameTonalities, (string)selectedGame["tonality"]);
+            editGameTechLevel = Array.IndexOf(gameTechLevels, (string)selectedGame["techLevel"]);
+        }
+        else
+        {
+            editGameName = null;
+            editGameDescription = null;
+            editGameGenre = 0;
+            editGameTonality = 0;
+            editGameTechLevel = 0;
+        }
+    }
+    
+    pageInitialized = true;
+
     GUILayout.BeginArea(new Rect(
         (position.width - Mathf.Min(400, position.width - 40)) / 2,
         20,
@@ -668,14 +583,42 @@ public class PlotTalkAI : EditorWindow
     
     if (GUILayout.Button("Сохранить", buttonStyle, GUILayout.Height(40)))
     {
-        if (!string.IsNullOrEmpty(loginEmail) && loginPassword == "1234")
+        if (!string.IsNullOrEmpty(editGameName) && !string.IsNullOrEmpty(editGameDescription))
         {
-            StorageApi.GetInstance().LogIn(0, "token_will_be_here", "{\"games\":[]}");
-            SwitchPage(Page.Main);
+            if (selectedGame != null)
+            {
+                var updGame = new JObject
+                { 
+                    ["name"] = editGameName,
+                    ["genre"] = gameGenres[editGameGenre],
+                    ["characters"] = new JArray(),
+                    ["tonality"] = gameTonalities[editGameTonality],
+                    ["techLevel"] = gameTechLevels[editGameTechLevel],
+                    ["description"] = editGameDescription
+                };
+                StorageApi.GetInstance().UpdateGame((string)selectedGame["id"], updGame);
+                SwitchPage(Page.Main);
+            }
+            else
+            {
+                var newGame = new JObject
+                {
+                    ["id"] = DateTimeOffset.Now.ToUnixTimeSeconds().ToString(),
+                    ["name"] = editGameName,
+                    ["genre"] = gameGenres[editGameGenre],
+                    ["scenes"] = new JArray(),
+                    ["characters"] = new JArray(),
+                    ["tonality"] = gameTonalities[editGameTonality],
+                    ["techLevel"] = gameTechLevels[editGameTechLevel],
+                    ["description"] = editGameDescription
+                };
+                StorageApi.GetInstance().AddGame(newGame);
+                SwitchPage(Page.GameDetail);
+            }
         }
         else
         {
-            EditorUtility.DisplayDialog("Ошибка", "Неверные данные", "OK");
+            EditorUtility.DisplayDialog("Ошибка", "Все поля обязательны для заполнения", "OK");
         }
     }
     
@@ -731,6 +674,8 @@ public class PlotTalkAI : EditorWindow
                 return;
             }
         }
+
+        pageInitialized = false;
 
         currentPage = page;
     }
