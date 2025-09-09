@@ -454,7 +454,7 @@ public class PlotTalkAI : EditorWindow
                     "Это действие необратимо. После того, как вы нажмете на кнопку \"OK\", игра будет безвозвратно удалена.",
                     "OK", "Отмена"))
             {
-                Debug.Log($"Удаление игры");
+                StorageApi.GetInstance().DeleteGame((string)game["id"]);
             }
         }
 
