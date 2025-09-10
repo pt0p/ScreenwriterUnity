@@ -165,6 +165,7 @@ namespace Plugins.PlotTalkAI.Utils
                 Debug.LogError("User must be logged in");
                 return;
             }
+
             JObject fullJson = LoadFullJson();
             JArray games = GetGamesArray(fullJson);
             games.Add(game);
@@ -178,6 +179,7 @@ namespace Plugins.PlotTalkAI.Utils
                 Debug.LogError("User must be logged in");
                 return;
             }
+
             JObject fullJson = LoadFullJson();
             JArray games = GetGamesArray(fullJson);
 
@@ -198,6 +200,7 @@ namespace Plugins.PlotTalkAI.Utils
                 Debug.LogError("User must be logged in");
                 return;
             }
+
             JObject fullJson = LoadFullJson();
             JArray games = GetGamesArray(fullJson);
 
@@ -219,6 +222,7 @@ namespace Plugins.PlotTalkAI.Utils
                 Debug.LogError("User must be logged in");
                 return;
             }
+
             JObject game = GetGameById(gameId);
             JArray scenes = GetScenesArray(game);
             scenes.Add(scene);
@@ -232,6 +236,7 @@ namespace Plugins.PlotTalkAI.Utils
                 Debug.LogError("User must be logged in");
                 return;
             }
+
             JObject game = GetGameById(gameId);
             JArray scenes = GetScenesArray(game);
 
@@ -252,6 +257,7 @@ namespace Plugins.PlotTalkAI.Utils
                 Debug.LogError("User must be logged in");
                 return;
             }
+
             JObject game = GetGameById(gameId);
             JArray scenes = GetScenesArray(game);
 
@@ -273,6 +279,7 @@ namespace Plugins.PlotTalkAI.Utils
                 Debug.LogError("User must be logged in");
                 return;
             }
+
             JObject scene = GetSceneById(gameId, sceneId);
             JArray scripts = GetScriptsArray(scene);
             scripts.Add(script);
@@ -286,6 +293,7 @@ namespace Plugins.PlotTalkAI.Utils
                 Debug.LogError("User must be logged in");
                 return;
             }
+
             JObject scene = GetSceneById(gameId, sceneId);
             JArray scripts = GetScriptsArray(scene);
 
@@ -306,6 +314,7 @@ namespace Plugins.PlotTalkAI.Utils
                 Debug.LogError("User must be logged in");
                 return;
             }
+
             JObject scene = GetSceneById(gameId, sceneId);
             JArray scripts = GetScriptsArray(scene);
 
@@ -358,6 +367,146 @@ namespace Plugins.PlotTalkAI.Utils
         public JArray GetScriptsArray(JObject scene)
         {
             return scene["scripts"] as JArray ?? new JArray();
+        }
+
+        public void AddCharacter(string gameId, JObject character)
+        {
+            if (!IsLoggedIn())
+            {
+                Debug.LogError("User must be logged in");
+                return;
+            }
+
+            JObject fullJson = LoadFullJson();
+            JObject game = GetGameById(gameId);
+            if (game == null)
+            {
+                Debug.LogError($"Game with id {gameId} not found");
+                return;
+            }
+
+            JArray characters = GetCharactersArray(game);
+            characters.Add(character);
+
+            // Обновляем игру в основном JSON
+            JArray games = GetGamesArray(fullJson);
+            for (int i = 0; i < games.Count; i++)
+            {
+                if (games[i]["id"]?.ToString() == gameId)
+                {
+                    games[i] = game;
+                    break;
+                }
+            }
+
+            SaveFullJson(fullJson);
+        }
+
+        public void UpdateCharacter(string gameId, string characterId, JObject updatedCharacter)
+        {
+            if (!IsLoggedIn())
+            {
+                Debug.LogError("User must be logged in");
+                return;
+            }
+
+            JObject fullJson = LoadFullJson();
+            JObject game = GetGameById(gameId);
+            if (game == null)
+            {
+                Debug.LogError($"Game with id {gameId} not found");
+                return;
+            }
+
+            JArray characters = GetCharactersArray(game);
+            bool found = false;
+
+            for (int i = 0; i < characters.Count; i++)
+            {
+                if (characters[i]["id"]?.ToString() == characterId)
+                {
+                    characters[i] = updatedCharacter;
+                    found = true;
+                    break;
+                }
+            }
+
+            if (!found)
+            {
+                Debug.LogError($"Character with id {characterId} not found in game {gameId}");
+                return;
+            }
+
+            // Обновляем игру в основном JSON
+            JArray games = GetGamesArray(fullJson);
+            for (int i = 0; i < games.Count; i++)
+            {
+                if (games[i]["id"]?.ToString() == gameId)
+                {
+                    games[i] = game;
+                    break;
+                }
+            }
+
+            SaveFullJson(fullJson);
+        }
+
+        public void DeleteCharacter(string gameId, string characterId)
+        {
+            if (!IsLoggedIn())
+            {
+                Debug.LogError("User must be logged in");
+                return;
+            }
+
+            JObject fullJson = LoadFullJson();
+            JObject game = GetGameById(gameId);
+            if (game == null)
+            {
+                Debug.LogError($"Game with id {gameId} not found");
+                return;
+            }
+
+            JArray characters = GetCharactersArray(game);
+            bool found = false;
+
+            for (int i = 0; i < characters.Count; i++)
+            {
+                if (characters[i]["id"]?.ToString() == characterId)
+                {
+                    characters.RemoveAt(i);
+                    found = true;
+                    break;
+                }
+            }
+
+            if (!found)
+            {
+                Debug.LogError($"Character with id {characterId} not found in game {gameId}");
+                return;
+            }
+
+            JArray games = GetGamesArray(fullJson);
+            for (int i = 0; i < games.Count; i++)
+            {
+                if (games[i]["id"]?.ToString() == gameId)
+                {
+                    games[i] = game;
+                    break;
+                }
+            }
+
+            SaveFullJson(fullJson);
+        }
+
+        public JArray GetCharactersArray(JObject game)
+        {
+            if (game["characters"] == null)
+            {
+                game["characters"] = new JArray();
+            }
+
+            return game["characters"] as JArray;
         }
     }
 }

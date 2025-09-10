@@ -13,7 +13,9 @@ public class PlotTalkAI : EditorWindow
         Register,
         Main,
         GameDetail,
-        EditGame
+        EditGame,
+        EditCharacters,
+        EditCharacter
     }
 
     private Page currentPage = Page.Login;
@@ -28,6 +30,12 @@ public class PlotTalkAI : EditorWindow
     private int editGameGenre;
     private int editGameTechLevel;
     private int editGameTonality;
+    private string editCharacterName;
+    private string editCharacterProfession;
+    private string editCharacterTraits;
+    private string editCharacterTalkStyle;
+    private string editCharacterLook;
+    private string editCharacterExtra;
 
     // Кэшированные стили
     private GUIStyle linkStyle;
@@ -44,13 +52,17 @@ public class PlotTalkAI : EditorWindow
 
     private bool isHoveringLink = false;
     private Vector2 scrollPosition;
-    
-    private string[] gameGenres = {"Приключения", "Фэнтези", "Детектив", "Драма", "Комедия", "Ужасы", "Стратегия"};
-    private string[] gameTechLevels = {"Каменный век", "Средневековье", "Индустриальный", "Современность", "Будущее", "Другое"};
-    private string[] gameTonalities = {"Нейтральная", "Героическая", "Трагическая", "Комическая", "Сказочная"};
-    
+
+    private string[] gameGenres = { "Приключения", "Фэнтези", "Детектив", "Драма", "Комедия", "Ужасы", "Стратегия" };
+
+    private string[] gameTechLevels =
+        { "Каменный век", "Средневековье", "Индустриальный", "Современность", "Будущее", "Другое" };
+
+    private string[] gameTonalities = { "Нейтральная", "Героическая", "Трагическая", "Комическая", "Сказочная" };
+
     private JObject selectedGame;
-    
+    private JObject selectedCharacter;
+
     private bool pageInitialized;
 
     [MenuItem("Window/PlotTalkAI")]
@@ -98,6 +110,12 @@ public class PlotTalkAI : EditorWindow
                 break;
             case Page.EditGame:
                 DrawEditGamePage();
+                break;
+            case Page.EditCharacters:
+                DrawEditCharactersPage();
+                break;
+            case Page.EditCharacter:
+                DrawEditCharacterPage();
                 break;
         }
 
@@ -440,7 +458,12 @@ public class PlotTalkAI : EditorWindow
             SwitchPage(Page.GameDetail);
         }
 
-        GUILayout.Space(5);
+
+        if (GUILayout.Button("Персонажи", GUILayout.Height(30)))
+        {
+            selectedGame = game;
+            SwitchPage(Page.EditCharacters);
+        }
 
         // Кнопка настроек игры
         if (GUILayout.Button(EditorGUIUtility.IconContent("Settings"), iconButtonStyle))
@@ -448,6 +471,7 @@ public class PlotTalkAI : EditorWindow
             selectedGame = game;
             SwitchPage(Page.EditGame);
         }
+
         if (GUILayout.Button("X", iconButtonStyle, GUILayout.Height(30)))
         {
             if (EditorUtility.DisplayDialog("Вы уверены?",
@@ -489,7 +513,7 @@ public class PlotTalkAI : EditorWindow
         foreach (var character in selectedGame["characters"])
         {
             GUILayout.BeginHorizontal(EditorStyles.helpBox);
-            GUILayout.Label("• " + (string)character["name"] + " ("+ (string)character["role"] + ")");
+            GUILayout.Label("• " + (string)character["name"] + " (" + (string)character["role"] + ")");
             GUILayout.EndHorizontal();
         }
 
@@ -503,153 +527,366 @@ public class PlotTalkAI : EditorWindow
     }
 
     private void DrawEditGamePage()
-{
-    if (!pageInitialized)
     {
-        if (selectedGame != null)
-        {
-            editGameName = (string)selectedGame["name"];
-            editGameDescription = (string)selectedGame["description"];
-            editGameGenre = Array.IndexOf(gameGenres, (string)selectedGame["genre"]);
-            editGameTonality = Array.IndexOf(gameTonalities, (string)selectedGame["tonality"]);
-            editGameTechLevel = Array.IndexOf(gameTechLevels, (string)selectedGame["techLevel"]);
-        }
-        else
-        {
-            editGameName = null;
-            editGameDescription = null;
-            editGameGenre = 0;
-            editGameTonality = 0;
-            editGameTechLevel = 0;
-        }
-    }
-    
-    pageInitialized = true;
-
-    GUILayout.BeginArea(new Rect(
-        (position.width - Mathf.Min(400, position.width - 40)) / 2,
-        20,
-        Mathf.Min(400, position.width * 0.8f),
-        position.height - 40
-    ));
-    
-    GUILayout.BeginVertical();
-    GUILayout.Label("Игра", centeredLabelStyle);
-    GUILayout.Space(30);
-    
-    // Рассчитываем доступную высоту для ScrollView
-    float availableHeight = CalculateAvailableHeight(); // 120 - примерная высота заголовка и кнопок
-    
-    // Начинаем ScrollView с фиксированной высотой
-    scrollPosition = GUILayout.BeginScrollView(scrollPosition, false, false, 
-        GUIStyle.none, GUI.skin.verticalScrollbar, 
-        GUILayout.Height(availableHeight));
-    
-    GUILayout.Label("Название", fieldLabelStyle);
-    editGameName = EditorGUILayout.TextField(editGameName, textFieldStyle);
-
-    GUILayout.Space(15);
-
-    GUILayout.Label("Характеристики мира", fieldLabelStyle);
-    editGameDescription = EditorGUILayout.TextArea(editGameDescription, 
-        GUILayout.Height(60)); // Фиксированная высота для текстового поля
-
-    GUILayout.Label("Жанр", fieldLabelStyle);
-    editGameGenre = EditorGUILayout.Popup(editGameGenre, gameGenres, textFieldStyle);
-    
-    GUILayout.Space(15);
-    
-    GUILayout.Label("Исторический период", fieldLabelStyle);
-    editGameTechLevel = EditorGUILayout.Popup(editGameTechLevel, gameTechLevels, textFieldStyle);
-    
-    GUILayout.Space(15);
-    
-    GUILayout.Label("Тональность", fieldLabelStyle);
-    editGameTonality = EditorGUILayout.Popup(editGameTonality, gameTonalities, textFieldStyle);
-
-    GUILayout.Space(15);
-    
-    GUILayout.EndScrollView();
-    
-    // Кнопки вне ScrollView, чтобы они всегда были видны
-    GUILayout.Space(15);
-    
-    if (GUILayout.Button("Изменить персонажей", buttonStyle, GUILayout.Height(40)))
-    {
-        // Ваш код для перехода к редактированию персонажей
-    }
-    
-    GUILayout.Space(5);
-    
-    if (GUILayout.Button("Сохранить", buttonStyle, GUILayout.Height(40)))
-    {
-        if (!string.IsNullOrEmpty(editGameName) && !string.IsNullOrEmpty(editGameDescription))
+        if (!pageInitialized)
         {
             if (selectedGame != null)
             {
-                var updGame = new JObject
-                { 
-                    ["name"] = editGameName,
-                    ["genre"] = gameGenres[editGameGenre],
-                    ["characters"] = new JArray(),
-                    ["tonality"] = gameTonalities[editGameTonality],
-                    ["techLevel"] = gameTechLevels[editGameTechLevel],
-                    ["description"] = editGameDescription
-                };
-                StorageApi.GetInstance().UpdateGame((string)selectedGame["id"], updGame);
-                SwitchPage(Page.Main);
+                editGameName = (string)selectedGame["name"];
+                editGameDescription = (string)selectedGame["description"];
+                editGameGenre = Array.IndexOf(gameGenres, (string)selectedGame["genre"]);
+                editGameTonality = Array.IndexOf(gameTonalities, (string)selectedGame["tonality"]);
+                editGameTechLevel = Array.IndexOf(gameTechLevels, (string)selectedGame["techLevel"]);
             }
             else
             {
-                var newGame = new JObject
-                {
-                    ["id"] = DateTimeOffset.Now.ToUnixTimeSeconds().ToString(),
-                    ["name"] = editGameName,
-                    ["genre"] = gameGenres[editGameGenre],
-                    ["scenes"] = new JArray(),
-                    ["characters"] = new JArray(),
-                    ["tonality"] = gameTonalities[editGameTonality],
-                    ["techLevel"] = gameTechLevels[editGameTechLevel],
-                    ["description"] = editGameDescription
-                };
-                StorageApi.GetInstance().AddGame(newGame);
-                SwitchPage(Page.GameDetail);
+                ClearEditGamePageFields();
             }
         }
-        else
+
+        pageInitialized = true;
+
+        GUILayout.BeginArea(new Rect(
+            (position.width - Mathf.Min(400, position.width - 40)) / 2,
+            20,
+            Mathf.Min(400, position.width * 0.8f),
+            position.height - 40
+        ));
+
+        GUILayout.BeginVertical();
+        GUILayout.Label("Игра", centeredLabelStyle);
+        GUILayout.Space(30);
+
+        // Рассчитываем доступную высоту для ScrollView
+        float availableHeight = CalculateAvailableHeight(); // 120 - примерная высота заголовка и кнопок
+
+        // Начинаем ScrollView с фиксированной высотой
+        scrollPosition = GUILayout.BeginScrollView(scrollPosition, false, false,
+            GUIStyle.none, GUI.skin.verticalScrollbar,
+            GUILayout.Height(availableHeight));
+
+        GUILayout.Label("Название", fieldLabelStyle);
+        editGameName = EditorGUILayout.TextField(editGameName, textFieldStyle);
+
+        GUILayout.Space(15);
+
+        GUILayout.Label("Характеристики мира", fieldLabelStyle);
+        editGameDescription = EditorGUILayout.TextArea(editGameDescription,
+            GUILayout.Height(60)); // Фиксированная высота для текстового поля
+
+        GUILayout.Label("Жанр", fieldLabelStyle);
+        editGameGenre = EditorGUILayout.Popup(editGameGenre, gameGenres, textFieldStyle);
+
+        GUILayout.Space(15);
+
+        GUILayout.Label("Исторический период", fieldLabelStyle);
+        editGameTechLevel = EditorGUILayout.Popup(editGameTechLevel, gameTechLevels, textFieldStyle);
+
+        GUILayout.Space(15);
+
+        GUILayout.Label("Тональность", fieldLabelStyle);
+        editGameTonality = EditorGUILayout.Popup(editGameTonality, gameTonalities, textFieldStyle);
+
+        GUILayout.Space(15);
+
+        GUILayout.EndScrollView();
+
+        GUILayout.Space(15);
+
+        GUILayout.Space(5);
+
+        if (GUILayout.Button("Сохранить", buttonStyle, GUILayout.Height(40)))
         {
-            EditorUtility.DisplayDialog("Ошибка", "Все поля обязательны для заполнения", "OK");
+            if (!string.IsNullOrEmpty(editGameName) && !string.IsNullOrEmpty(editGameDescription))
+            {
+                if (selectedGame != null)
+                {
+                    var updGame = new JObject
+                    {
+                        ["name"] = editGameName,
+                        ["genre"] = gameGenres[editGameGenre],
+                        ["characters"] = new JArray(),
+                        ["tonality"] = gameTonalities[editGameTonality],
+                        ["techLevel"] = gameTechLevels[editGameTechLevel],
+                        ["description"] = editGameDescription
+                    };
+                    StorageApi.GetInstance().UpdateGame((string)selectedGame["id"], updGame);
+                    ClearEditGamePageFields();
+                    SwitchPage(Page.Main);
+                }
+                else
+                {
+                    var newGame = new JObject
+                    {
+                        ["id"] = DateTimeOffset.Now.ToUnixTimeSeconds().ToString(),
+                        ["name"] = editGameName,
+                        ["genre"] = gameGenres[editGameGenre],
+                        ["scenes"] = new JArray(),
+                        ["characters"] = new JArray(),
+                        ["tonality"] = gameTonalities[editGameTonality],
+                        ["techLevel"] = gameTechLevels[editGameTechLevel],
+                        ["description"] = editGameDescription
+                    };
+                    StorageApi.GetInstance().AddGame(newGame);
+                    ClearEditGamePageFields();
+                    SwitchPage(Page.GameDetail);
+                }
+            }
+            else
+            {
+                EditorUtility.DisplayDialog("Ошибка", "Все поля обязательны для заполнения", "OK");
+            }
         }
-    }
-    
-    GUILayout.Space(5);
-    
-    if (GUILayout.Button("Отменить", buttonStyle, GUILayout.Height(40)))
-    {
-        if (EditorUtility.DisplayDialog("Вы уверены?",
-                "После того, как вы нажмете на кнопку \"Да\", все внесенные изменения сбросятся.",
-                "Да", "Отмена"))
+
+        GUILayout.Space(5);
+
+        if (GUILayout.Button("Отменить", buttonStyle, GUILayout.Height(40)))
         {
+            if (EditorUtility.DisplayDialog("Вы уверены?",
+                    "После того, как вы нажмете на кнопку \"Да\", все внесенные изменения сбросятся.",
+                    "Да", "Отмена"))
+            {
+                selectedGame = null;
+                ClearEditGamePageFields();
+                SwitchPage(Page.Main);
+            }
+        }
+
+        GUILayout.EndVertical();
+        GUILayout.EndArea();
+    }
+
+    private void DrawEditCharactersPage()
+    {
+        GUILayout.Label("Персонажи", centeredLabelStyle);
+        GUILayout.Space(30);
+        scrollPosition =
+            GUILayout.BeginScrollView(scrollPosition, false, false, GUIStyle.none, GUI.skin.verticalScrollbar);
+        GUILayout.BeginVertical();
+        foreach (var character in StorageApi.GetInstance().GetCharactersArray(selectedGame))
+        {
+            DrawCharacterCard(character);
+        }
+
+        GUILayout.EndVertical();
+        GUILayout.EndScrollView();
+
+        GUILayout.Space(15);
+
+        if (GUILayout.Button("Создать персонажа", buttonStyle, GUILayout.Height(40)))
+        {
+            selectedCharacter = null;
+            SwitchPage(Page.EditCharacter);
+        }
+
+        GUILayout.Space(5);
+        if (GUILayout.Button("Готово", buttonStyle, GUILayout.Height(40)))
+        {
+            selectedCharacter = null;
             selectedGame = null;
             SwitchPage(Page.Main);
         }
     }
 
-    GUILayout.EndVertical();
-    GUILayout.EndArea();
-}
-    
+    private void DrawCharacterCard(JToken character)
+    {
+        GUILayout.BeginHorizontal(cardStyle);
+        GUILayout.Label((string)character["name"], centeredLabelStyle);
+        GUILayout.Space(10);
+
+        if (GUILayout.Button(EditorGUIUtility.IconContent("Settings"), iconButtonStyle))
+        {
+            selectedCharacter = (JObject)character;
+            SwitchPage(Page.EditCharacter);
+        }
+
+        if (GUILayout.Button("X", iconButtonStyle, GUILayout.Height(30)))
+        {
+            if (EditorUtility.DisplayDialog("Вы уверены?",
+                    "Это действие необратимо. После того, как вы нажмете на кнопку \"OK\", персонаж будет безвозвратно удален.",
+                    "OK", "Отмена"))
+            {
+                StorageApi.GetInstance().DeleteCharacter((string)selectedGame["id"], (string)character["id"]);
+                selectedGame = StorageApi.GetInstance().GetGameById((string)selectedGame["id"]);
+            }
+        }
+
+        GUILayout.EndHorizontal();
+    }
+
+    private void DrawEditCharacterPage()
+    {
+        if (!pageInitialized)
+        {
+            if (selectedCharacter != null)
+            {
+                editCharacterName = (string)selectedCharacter["name"];
+                editCharacterProfession = (string)selectedCharacter["profession"];
+                editCharacterTraits = (string)selectedCharacter["traits"];
+                editCharacterTalkStyle = (string)selectedCharacter["talk_style"];
+                editCharacterLook = (string)selectedCharacter["look"];
+                editCharacterExtra = (string)selectedCharacter["extra"];
+            }
+            else
+            {
+                ClearEditCharacterPageFields();
+            }
+        }
+
+        pageInitialized = true;
+
+        GUILayout.BeginArea(new Rect(
+            (position.width - Mathf.Min(400, position.width - 40)) / 2,
+            20,
+            Mathf.Min(400, position.width * 0.8f),
+            position.height - 40
+        ));
+
+        GUILayout.BeginVertical();
+        GUILayout.Label("Персонаж", centeredLabelStyle);
+        GUILayout.Space(30);
+
+        // Рассчитываем доступную высоту для ScrollView
+        float availableHeight = CalculateAvailableHeight(); // 120 - примерная высота заголовка и кнопок
+
+        // Начинаем ScrollView с фиксированной высотой
+        scrollPosition = GUILayout.BeginScrollView(scrollPosition, false, false,
+            GUIStyle.none, GUI.skin.verticalScrollbar,
+            GUILayout.Height(availableHeight));
+
+        GUILayout.Label("Имя", fieldLabelStyle);
+        editCharacterName = EditorGUILayout.TextField(editCharacterName, textFieldStyle);
+        GUILayout.Space(15);
+
+        GUILayout.Label("Профессия", fieldLabelStyle);
+        editCharacterProfession = EditorGUILayout.TextField(editCharacterProfession, textFieldStyle);
+
+        GUILayout.Space(15);
+
+        GUILayout.Label("Характер", fieldLabelStyle);
+        editCharacterTraits = EditorGUILayout.TextField(editCharacterTraits, textFieldStyle);
+
+        GUILayout.Space(15);
+
+        GUILayout.Label("Стиль речи", fieldLabelStyle);
+        editCharacterTalkStyle = EditorGUILayout.TextArea(editCharacterTalkStyle,
+            GUILayout.Height(60));
+
+        GUILayout.Space(15);
+
+        GUILayout.Label("Внешний вид", fieldLabelStyle);
+        editCharacterLook = EditorGUILayout.TextArea(editCharacterLook,
+            GUILayout.Height(60));
+
+        GUILayout.Space(15);
+
+        GUILayout.Label("Характеристика", fieldLabelStyle);
+        editCharacterExtra = EditorGUILayout.TextArea(editCharacterExtra,
+            GUILayout.Height(60)); // Фиксированная высота для текстового поля
+
+        GUILayout.Space(15);
+
+        GUILayout.EndScrollView();
+
+        // Кнопки вне ScrollView, чтобы они всегда были видны
+        GUILayout.Space(15);
+
+        if (GUILayout.Button("Сохранить", buttonStyle, GUILayout.Height(40)))
+        {
+            if (!string.IsNullOrEmpty(editCharacterLook) && !string.IsNullOrEmpty(editCharacterName) &&
+                !string.IsNullOrEmpty(editCharacterProfession) && !string.IsNullOrEmpty(editCharacterTraits) &&
+                !string.IsNullOrEmpty(editCharacterTalkStyle) && !string.IsNullOrEmpty(editCharacterLook) &&
+                !string.IsNullOrEmpty(editCharacterExtra))
+            {
+                if (selectedCharacter != null)
+                {
+                    var updChar = new JObject
+                    {
+                        ["look"] = editCharacterLook,
+                        ["name"] = editCharacterName,
+                        ["extra"] = editCharacterExtra,
+                        ["traits"] = editCharacterTraits,
+                        ["profession"] = editCharacterProfession,
+                        ["talk_style"] = editCharacterTalkStyle
+                    };
+                    StorageApi.GetInstance().UpdateCharacter((string)selectedGame["id"],
+                        (string)selectedCharacter["id"], updChar);
+                    ClearEditGamePageFields();
+                    selectedGame = StorageApi.GetInstance().GetGameById((string)selectedGame["id"]);
+                    SwitchPage(Page.EditCharacters);
+                }
+                else
+                {
+                    var newChar = new JObject
+                    {
+                        ["id"] = DateTimeOffset.Now.ToUnixTimeSeconds().ToString(),
+                        ["look"] = editCharacterLook,
+                        ["name"] = editCharacterName,
+                        ["extra"] = editCharacterExtra,
+                        ["traits"] = editCharacterTraits,
+                        ["profession"] = editCharacterProfession,
+                        ["talk_style"] = editCharacterTalkStyle,
+                        ["type"] = "NPC"
+                    };
+                    StorageApi.GetInstance().AddCharacter((string)selectedGame["id"], newChar);
+                    ClearEditCharacterPageFields();
+                    selectedGame = StorageApi.GetInstance().GetGameById((string)selectedGame["id"]);
+                    SwitchPage(Page.EditCharacters);
+                }
+            }
+            else
+            {
+                EditorUtility.DisplayDialog("Ошибка", "Все поля обязательны для заполнения", "OK");
+            }
+        }
+
+        GUILayout.Space(5);
+
+        if (GUILayout.Button("Отменить", buttonStyle, GUILayout.Height(40)))
+        {
+            if (EditorUtility.DisplayDialog("Вы уверены?",
+                    "После того, как вы нажмете на кнопку \"Да\", все внесенные изменения сбросятся.",
+                    "Да", "Отмена"))
+            {
+                selectedCharacter = null;
+                SwitchPage(Page.EditCharacters);
+            }
+        }
+
+        GUILayout.EndVertical();
+        GUILayout.EndArea();
+    }
+
+    private void ClearEditGamePageFields()
+    {
+        editGameName = null;
+        editGameDescription = null;
+        editGameGenre = 0;
+        editGameTonality = 0;
+        editGameTechLevel = 0;
+    }
+
+    private void ClearEditCharacterPageFields()
+    {
+        editCharacterName = null;
+        editCharacterProfession = null;
+        editCharacterTraits = null;
+        editCharacterTalkStyle = null;
+        editCharacterLook = null;
+        editCharacterExtra = null;
+    }
+
     private float CalculateAvailableHeight()
     {
         // Базовые отступы
         float basePadding = 40f;
-    
+
         // Высота заголовка и отступов
         float headerHeight = 50f + 30f;
-    
+
         // Высота кнопок (3 кнопки по 40 + отступы)
         float buttonsHeight = 3 * 40f + 2 * 5f + 20f;
-    
+
         return position.height - basePadding - headerHeight - buttonsHeight;
     }
 
