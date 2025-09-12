@@ -939,8 +939,13 @@ public class PlotTalkAI : EditorWindow
                 sceneExpandedStates[sceneId] = !sceneExpandedStates[sceneId];
             }
             GUILayout.FlexibleSpace();
-
+            
             // Кнопки управления сценой
+            if (GUILayout.Button("+", new GUIStyle(iconButtonStyle){fontSize = 18, padding = new RectOffset(8, 5, 5, 8)}))
+            {
+                // Логика добавления диалога
+            }
+
             if (GUILayout.Button(EditorGUIUtility.IconContent("Settings"), iconButtonStyle))
             {
                 // Логика изменения сцены
@@ -948,7 +953,13 @@ public class PlotTalkAI : EditorWindow
 
             if (GUILayout.Button("X", iconButtonStyle))
             {
-                // Логика удаления сцены
+                if (EditorUtility.DisplayDialog("Вы уверены?",
+                        "Это действие необратимо. После того, как вы нажмете на кнопку \"OK\", сцена будет безвозвратно удалена.",
+                        "OK", "Отмена"))
+                {
+                    StorageApi.GetInstance().DeleteScene((string)selectedGame["id"], sceneId);
+                    selectedGame = StorageApi.GetInstance().GetGameById((string)selectedGame["id"]);
+                }
             }
 
             if (GUILayout.Button(EditorGUIUtility.IconContent("Download-Available"), iconButtonStyle))
@@ -988,7 +999,14 @@ public class PlotTalkAI : EditorWindow
 
                     if (GUILayout.Button("X", iconButtonStyle))
                     {
-                        // Логика удаления диалога
+                        if (EditorUtility.DisplayDialog("Вы уверены?",
+                                "Это действие необратимо. После того, как вы нажмете на кнопку \"OK\", диалог будет безвозвратно удален.",
+                                "OK", "Отмена"))
+                        {
+                            StorageApi.GetInstance()
+                                .DeleteScript((string)selectedGame["id"], sceneId, (string)script["id"]);
+                            selectedGame = StorageApi.GetInstance().GetGameById((string)selectedGame["id"]);
+                        }
                     }
 
                     GUILayout.Space(18);

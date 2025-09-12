@@ -144,7 +144,6 @@ namespace Plugins.PlotTalkAI.Utils
             if (!Directory.Exists(_jsonDir))
             {
                 Directory.CreateDirectory(_jsonDir);
-                Debug.Log($"Создана папка {_jsonDir}");
             }
 
             if (!File.Exists(_jsonPath))
@@ -153,8 +152,6 @@ namespace Plugins.PlotTalkAI.Utils
                 string json = "{ \"user\": {} }";
 
                 File.WriteAllText(_jsonPath, json);
-
-                Debug.Log($"JSON создан по пути: {_jsonPath}");
             }
         }
 
@@ -183,11 +180,14 @@ namespace Plugins.PlotTalkAI.Utils
             JObject fullJson = LoadFullJson();
             JArray games = GetGamesArray(fullJson);
 
-            foreach (JObject game in games.Where(g => g["id"]?.ToString() == gameId))
+            for (int i = 0; i < games.Count; i++)
             {
-                game.Merge(updatedGame, new JsonMergeSettings { MergeArrayHandling = MergeArrayHandling.Replace });
-                SaveFullJson(fullJson);
-                return;
+                if (games[i]["id"]?.ToString() == gameId)
+                {
+                    games[i] = updatedGame;
+                    SaveFullJson(fullJson);
+                    return;
+                }
             }
 
             Debug.LogError($"Game with id {gameId} not found");
@@ -223,10 +223,19 @@ namespace Plugins.PlotTalkAI.Utils
                 return;
             }
 
-            JObject game = GetGameById(gameId);
+            JObject fullJson = LoadFullJson();
+            JArray games = GetGamesArray(fullJson);
+            
+            JObject game = games.FirstOrDefault(g => g["id"]?.ToString() == gameId) as JObject;
+            if (game == null)
+            {
+                Debug.LogError($"Game with id {gameId} not found");
+                return;
+            }
+
             JArray scenes = GetScenesArray(game);
             scenes.Add(scene);
-            SaveFullJson(LoadFullJson()); // Перезагружаем и сохраняем полный JSON
+            SaveFullJson(fullJson);
         }
 
         public void UpdateScene(string gameId, long sceneId, JObject updatedScene)
@@ -237,14 +246,26 @@ namespace Plugins.PlotTalkAI.Utils
                 return;
             }
 
-            JObject game = GetGameById(gameId);
-            JArray scenes = GetScenesArray(game);
-
-            foreach (JObject scene in scenes.Where(s => (long)s["id"] == sceneId))
+            JObject fullJson = LoadFullJson();
+            JArray games = GetGamesArray(fullJson);
+            
+            JObject game = games.FirstOrDefault(g => g["id"]?.ToString() == gameId) as JObject;
+            if (game == null)
             {
-                scene.Merge(updatedScene, new JsonMergeSettings { MergeArrayHandling = MergeArrayHandling.Replace });
-                SaveFullJson(LoadFullJson());
+                Debug.LogError($"Game with id {gameId} not found");
                 return;
+            }
+
+            JArray scenes = GetScenesArray(game);
+            
+            for (int i = 0; i < scenes.Count; i++)
+            {
+                if ((long)scenes[i]["id"] == sceneId)
+                {
+                    scenes[i] = updatedScene;
+                    SaveFullJson(fullJson);
+                    return;
+                }
             }
 
             Debug.LogError($"Scene with id {sceneId} not found in game {gameId}");
@@ -258,14 +279,23 @@ namespace Plugins.PlotTalkAI.Utils
                 return;
             }
 
-            JObject game = GetGameById(gameId);
-            JArray scenes = GetScenesArray(game);
+            JObject fullJson = LoadFullJson();
+            JArray games = GetGamesArray(fullJson);
+            
+            JObject game = games.FirstOrDefault(g => g["id"]?.ToString() == gameId) as JObject;
+            if (game == null)
+            {
+                Debug.LogError($"Game with id {gameId} not found");
+                return;
+            }
 
+            JArray scenes = GetScenesArray(game);
+            
             JObject sceneToRemove = scenes.FirstOrDefault(s => (long)s["id"] == sceneId) as JObject;
             if (sceneToRemove != null)
             {
                 scenes.Remove(sceneToRemove);
-                SaveFullJson(LoadFullJson());
+                SaveFullJson(fullJson);
                 return;
             }
 
@@ -280,10 +310,28 @@ namespace Plugins.PlotTalkAI.Utils
                 return;
             }
 
-            JObject scene = GetSceneById(gameId, sceneId);
+            JObject fullJson = LoadFullJson();
+            JArray games = GetGamesArray(fullJson);
+            
+            JObject game = games.FirstOrDefault(g => g["id"]?.ToString() == gameId) as JObject;
+            if (game == null)
+            {
+                Debug.LogError($"Game with id {gameId} not found");
+                return;
+            }
+
+            JArray scenes = GetScenesArray(game);
+            JObject scene = scenes.FirstOrDefault(s => (long)s["id"] == sceneId) as JObject;
+            
+            if (scene == null)
+            {
+                Debug.LogError($"Scene with id {sceneId} not found in game {gameId}");
+                return;
+            }
+
             JArray scripts = GetScriptsArray(scene);
             scripts.Add(script);
-            SaveFullJson(LoadFullJson());
+            SaveFullJson(fullJson);
         }
 
         public void UpdateScript(string gameId, long sceneId, string scriptId, JObject updatedScript)
@@ -294,14 +342,35 @@ namespace Plugins.PlotTalkAI.Utils
                 return;
             }
 
-            JObject scene = GetSceneById(gameId, sceneId);
-            JArray scripts = GetScriptsArray(scene);
-
-            foreach (JObject script in scripts.Where(s => s["id"]?.ToString() == scriptId))
+            JObject fullJson = LoadFullJson();
+            JArray games = GetGamesArray(fullJson);
+            
+            JObject game = games.FirstOrDefault(g => g["id"]?.ToString() == gameId) as JObject;
+            if (game == null)
             {
-                script.Merge(updatedScript, new JsonMergeSettings { MergeArrayHandling = MergeArrayHandling.Replace });
-                SaveFullJson(LoadFullJson());
+                Debug.LogError($"Game with id {gameId} not found");
                 return;
+            }
+
+            JArray scenes = GetScenesArray(game);
+            JObject scene = scenes.FirstOrDefault(s => (long)s["id"] == sceneId) as JObject;
+            
+            if (scene == null)
+            {
+                Debug.LogError($"Scene with id {sceneId} not found in game {gameId}");
+                return;
+            }
+
+            JArray scripts = GetScriptsArray(scene);
+            
+            for (int i = 0; i < scripts.Count; i++)
+            {
+                if (scripts[i]["id"]?.ToString() == scriptId)
+                {
+                    scripts[i] = updatedScript;
+                    SaveFullJson(fullJson);
+                    return;
+                }
             }
 
             Debug.LogError($"Script with id {scriptId} not found in scene {sceneId}");
@@ -315,14 +384,32 @@ namespace Plugins.PlotTalkAI.Utils
                 return;
             }
 
-            JObject scene = GetSceneById(gameId, sceneId);
-            JArray scripts = GetScriptsArray(scene);
+            JObject fullJson = LoadFullJson();
+            JArray games = GetGamesArray(fullJson);
+            
+            JObject game = games.FirstOrDefault(g => g["id"]?.ToString() == gameId) as JObject;
+            if (game == null)
+            {
+                Debug.LogError($"Game with id {gameId} not found");
+                return;
+            }
 
+            JArray scenes = GetScenesArray(game);
+            JObject scene = scenes.FirstOrDefault(s => (long)s["id"] == sceneId) as JObject;
+            
+            if (scene == null)
+            {
+                Debug.LogError($"Scene with id {sceneId} not found in game {gameId}");
+                return;
+            }
+
+            JArray scripts = GetScriptsArray(scene);
+            
             JObject scriptToRemove = scripts.FirstOrDefault(s => s["id"]?.ToString() == scriptId) as JObject;
             if (scriptToRemove != null)
             {
                 scripts.Remove(scriptToRemove);
-                SaveFullJson(LoadFullJson());
+                SaveFullJson(fullJson);
                 return;
             }
 
@@ -342,7 +429,11 @@ namespace Plugins.PlotTalkAI.Utils
 
         public JArray GetGamesArray(JObject fullJson)
         {
-            return fullJson["user"]["data"]["games"] as JArray ?? new JArray();
+            if (fullJson["user"]?["data"]?["games"] == null)
+            {
+                fullJson["user"]["data"]["games"] = new JArray();
+            }
+            return fullJson["user"]["data"]["games"] as JArray;
         }
 
         public JObject GetGameById(string gameId)
@@ -354,19 +445,29 @@ namespace Plugins.PlotTalkAI.Utils
 
         public JArray GetScenesArray(JObject game)
         {
-            return game["scenes"] as JArray ?? new JArray();
+            if (game["scenes"] == null)
+            {
+                game["scenes"] = new JArray();
+            }
+            return game["scenes"] as JArray;
         }
 
         public JObject GetSceneById(string gameId, long sceneId)
         {
             JObject game = GetGameById(gameId);
+            if (game == null) return null;
+            
             JArray scenes = GetScenesArray(game);
             return scenes.FirstOrDefault(s => (long)s["id"] == sceneId) as JObject;
         }
 
         public JArray GetScriptsArray(JObject scene)
         {
-            return scene["scripts"] as JArray ?? new JArray();
+            if (scene["scripts"] == null)
+            {
+                scene["scripts"] = new JArray();
+            }
+            return scene["scripts"] as JArray;
         }
 
         public void AddCharacter(string gameId, JObject character)
@@ -378,7 +479,9 @@ namespace Plugins.PlotTalkAI.Utils
             }
 
             JObject fullJson = LoadFullJson();
-            JObject game = GetGameById(gameId);
+            JArray games = GetGamesArray(fullJson);
+            
+            JObject game = games.FirstOrDefault(g => g["id"]?.ToString() == gameId) as JObject;
             if (game == null)
             {
                 Debug.LogError($"Game with id {gameId} not found");
@@ -387,18 +490,6 @@ namespace Plugins.PlotTalkAI.Utils
 
             JArray characters = GetCharactersArray(game);
             characters.Add(character);
-
-            // Обновляем игру в основном JSON
-            JArray games = GetGamesArray(fullJson);
-            for (int i = 0; i < games.Count; i++)
-            {
-                if (games[i]["id"]?.ToString() == gameId)
-                {
-                    games[i] = game;
-                    break;
-                }
-            }
-
             SaveFullJson(fullJson);
         }
 
@@ -411,7 +502,9 @@ namespace Plugins.PlotTalkAI.Utils
             }
 
             JObject fullJson = LoadFullJson();
-            JObject game = GetGameById(gameId);
+            JArray games = GetGamesArray(fullJson);
+            
+            JObject game = games.FirstOrDefault(g => g["id"]?.ToString() == gameId) as JObject;
             if (game == null)
             {
                 Debug.LogError($"Game with id {gameId} not found");
@@ -419,36 +512,18 @@ namespace Plugins.PlotTalkAI.Utils
             }
 
             JArray characters = GetCharactersArray(game);
-            bool found = false;
-
+            
             for (int i = 0; i < characters.Count; i++)
             {
                 if (characters[i]["id"]?.ToString() == characterId)
                 {
                     characters[i] = updatedCharacter;
-                    found = true;
-                    break;
+                    SaveFullJson(fullJson);
+                    return;
                 }
             }
 
-            if (!found)
-            {
-                Debug.LogError($"Character with id {characterId} not found in game {gameId}");
-                return;
-            }
-
-            // Обновляем игру в основном JSON
-            JArray games = GetGamesArray(fullJson);
-            for (int i = 0; i < games.Count; i++)
-            {
-                if (games[i]["id"]?.ToString() == gameId)
-                {
-                    games[i] = game;
-                    break;
-                }
-            }
-
-            SaveFullJson(fullJson);
+            Debug.LogError($"Character with id {characterId} not found in game {gameId}");
         }
 
         public void DeleteCharacter(string gameId, string characterId)
@@ -460,7 +535,9 @@ namespace Plugins.PlotTalkAI.Utils
             }
 
             JObject fullJson = LoadFullJson();
-            JObject game = GetGameById(gameId);
+            JArray games = GetGamesArray(fullJson);
+            
+            JObject game = games.FirstOrDefault(g => g["id"]?.ToString() == gameId) as JObject;
             if (game == null)
             {
                 Debug.LogError($"Game with id {gameId} not found");
@@ -468,35 +545,16 @@ namespace Plugins.PlotTalkAI.Utils
             }
 
             JArray characters = GetCharactersArray(game);
-            bool found = false;
-
-            for (int i = 0; i < characters.Count; i++)
+            
+            JObject characterToRemove = characters.FirstOrDefault(c => c["id"]?.ToString() == characterId) as JObject;
+            if (characterToRemove != null)
             {
-                if (characters[i]["id"]?.ToString() == characterId)
-                {
-                    characters.RemoveAt(i);
-                    found = true;
-                    break;
-                }
-            }
-
-            if (!found)
-            {
-                Debug.LogError($"Character with id {characterId} not found in game {gameId}");
+                characters.Remove(characterToRemove);
+                SaveFullJson(fullJson);
                 return;
             }
 
-            JArray games = GetGamesArray(fullJson);
-            for (int i = 0; i < games.Count; i++)
-            {
-                if (games[i]["id"]?.ToString() == gameId)
-                {
-                    games[i] = game;
-                    break;
-                }
-            }
-
-            SaveFullJson(fullJson);
+            Debug.LogError($"Character with id {characterId} not found in game {gameId}");
         }
 
         public JArray GetCharactersArray(JObject game)
@@ -505,7 +563,6 @@ namespace Plugins.PlotTalkAI.Utils
             {
                 game["characters"] = new JArray();
             }
-
             return game["characters"] as JArray;
         }
     }
