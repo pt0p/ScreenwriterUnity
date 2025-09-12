@@ -7,6 +7,8 @@ using Newtonsoft.Json.Linq;
 
 public class PlotTalkAI : EditorWindow
 {
+    
+    // pages
     public enum Page
     {
         Login,
@@ -20,6 +22,8 @@ public class PlotTalkAI : EditorWindow
 
     private Page currentPage = Page.Login;
     private Page previousPage = Page.Login;
+    
+    // fields
     private string loginEmail = "";
     private string loginPassword = "";
     private string registerEmail = "";
@@ -37,9 +41,10 @@ public class PlotTalkAI : EditorWindow
     private string editCharacterLook;
     private string editCharacterExtra;
 
-    // Кэшированные стили
+    // cashed styles
     private GUIStyle linkStyle;
     private GUIStyle centeredLabelStyle;
+    private GUIStyle centeredItalicLabelStyle;
     private GUIStyle fieldLabelStyle;
     private GUIStyle buttonStyle;
     private GUIStyle textFieldStyle;
@@ -49,10 +54,13 @@ public class PlotTalkAI : EditorWindow
     private GUIStyle iconButtonStyle;
     private GUIStyle plusStyle;
     private GUIStyle plusLabelStyle;
+    private GUIStyle arrowButtonStyle;
+    private GUIStyle scriptLabelStyle;
 
     private bool isHoveringLink = false;
     private Vector2 scrollPosition;
 
+    // dropdowns
     private string[] gameGenres = { "Приключения", "Фэнтези", "Детектив", "Драма", "Комедия", "Ужасы", "Стратегия" };
 
     private string[] gameTechLevels =
@@ -60,10 +68,13 @@ public class PlotTalkAI : EditorWindow
 
     private string[] gameTonalities = { "Нейтральная", "Героическая", "Трагическая", "Комическая", "Сказочная" };
 
+    // selected objects
     private JObject selectedGame;
     private JObject selectedCharacter;
 
     private bool pageInitialized;
+    
+    private Dictionary<long, bool> sceneExpandedStates = new Dictionary<long, bool>();
 
     [MenuItem("Window/PlotTalkAI")]
     public static void ShowWindow()
@@ -151,6 +162,15 @@ public class PlotTalkAI : EditorWindow
             normal = { textColor = textColor },
             wordWrap = true
         };
+        
+        centeredItalicLabelStyle = new GUIStyle(EditorStyles.label)
+        {
+            alignment = TextAnchor.MiddleCenter,
+            fontSize = 14,
+            fontStyle = FontStyle.Italic,
+            normal = { textColor = textColor },
+            wordWrap = true
+        };
 
         fieldLabelStyle = new GUIStyle(EditorStyles.label)
         {
@@ -222,6 +242,26 @@ public class PlotTalkAI : EditorWindow
             alignment = TextAnchor.MiddleCenter,
             fontStyle = FontStyle.Bold,
             normal = { textColor = EditorGUIUtility.isProSkin ? Color.white : Color.black }
+        };
+        
+        // Стиль для кнопки со стрелкой
+        arrowButtonStyle = new GUIStyle(EditorStyles.label)
+        {
+            alignment = TextAnchor.UpperCenter,
+            normal = { textColor = Color.white },
+            hover = { textColor = new Color(0.75f, 0.75f, 0.75f) },
+            active = { textColor = new Color(0.75f, 0.75f, 0.75f) },
+            padding = new RectOffset(0, 0, 0, 0),
+            margin = new RectOffset(0, 0, 0, 0),
+            fixedWidth = 20,
+            fixedHeight = 20
+        };
+        
+        scriptLabelStyle = new GUIStyle(EditorStyles.label)
+        {
+            normal = { textColor = textColor },
+            hover = {textColor = new Color(0.75f, 0.75f, 0.75f)},
+            fontSize = 14,
         };
     }
 
@@ -490,40 +530,6 @@ public class PlotTalkAI : EditorWindow
     {
         SwitchPage(Page.EditGame);
         selectedGame = null;
-    }
-
-    private void DrawGameDetailPage()
-    {
-        if (selectedGame == null)
-        {
-            SwitchPage(Page.Main);
-            return;
-        }
-
-        GUILayout.Label((string)selectedGame["title"], centeredLabelStyle);
-        GUILayout.Space(20);
-
-        GUILayout.Label("Описание:", EditorStyles.boldLabel);
-        GUILayout.Label((string)selectedGame["description"], EditorStyles.wordWrappedLabel);
-
-        GUILayout.Space(20);
-
-        GUILayout.Label("Персонажи:", EditorStyles.boldLabel);
-
-        foreach (var character in selectedGame["characters"])
-        {
-            GUILayout.BeginHorizontal(EditorStyles.helpBox);
-            GUILayout.Label("• " + (string)character["name"] + " (" + (string)character["role"] + ")");
-            GUILayout.EndHorizontal();
-        }
-
-        GUILayout.Space(30);
-
-        // Кнопка возврата
-        if (GUILayout.Button("Назад", buttonStyle))
-        {
-            SwitchPage(Page.Main);
-        }
     }
 
     private void DrawEditGamePage()
@@ -856,6 +862,150 @@ public class PlotTalkAI : EditorWindow
         GUILayout.EndVertical();
         GUILayout.EndArea();
     }
+
+    private void DrawGameDetailPage()
+{
+    if (selectedGame == null)
+    {
+        SwitchPage(Page.Main);
+        return;
+    }
+
+    GUILayout.BeginArea(new Rect(
+        20,
+        20,
+        position.width - 40,
+        position.height - 40
+    ));
+
+    // Заголовок
+    GUILayout.Label($"Игра: {(string)selectedGame["name"]}", centeredLabelStyle);
+    GUILayout.Space(20);
+
+    // Кнопки управления
+    if (GUILayout.Button("Назад", buttonStyle, GUILayout.Height(35)))
+    {
+        SwitchPage(Page.Main);
+    }
+    
+    GUILayout.Space(10);
+
+    if (GUILayout.Button("Создать сцену", buttonStyle, GUILayout.Height(35)))
+    {
+        // Логика создания сцены
+    }
+
+    GUILayout.Space(20);
+
+    // Список сцен
+    scrollPosition = GUILayout.BeginScrollView(scrollPosition, false, false, GUIStyle.none, GUI.skin.verticalScrollbar);
+    GUILayout.BeginVertical();
+
+    var scenes = selectedGame["scenes"] as JArray;
+    if (scenes != null)
+    {
+        for (int i = 0; i < scenes.Count; i++)
+        {
+            var scene = scenes[i];
+            long sceneId = (long)scene["id"];
+            
+            // Инициализируем состояние, если нужно
+            if (!sceneExpandedStates.ContainsKey(sceneId))
+            {
+                sceneExpandedStates[sceneId] = false;
+            }
+
+            GUILayout.BeginVertical();
+
+            // Заголовок сцены
+            GUILayout.BeginHorizontal(GUILayout.Height(50));
+            
+            // Создаем область для кнопки со стрелкой с вертикальным выравниванием
+            GUILayout.BeginVertical(GUILayout.Width(20));
+            GUILayout.Space(8.5f);
+            // Кнопка раскрытия/скрытия с белой стрелкой
+            var arrowContent = new GUIContent(sceneExpandedStates[sceneId] ? "▼" : "►");
+            var arrowSize = GUI.skin.button.CalcSize(arrowContent);
+            
+            if (GUILayout.Button(arrowContent, arrowButtonStyle, GUILayout.Width(20), GUILayout.Height(20)))
+            {
+                sceneExpandedStates[sceneId] = !sceneExpandedStates[sceneId];
+            }
+            
+            GUILayout.EndVertical();
+
+            if (GUILayout.Button((string)scene["name"], cardTitleStyle))
+            {
+                sceneExpandedStates[sceneId] = !sceneExpandedStates[sceneId];
+            }
+            GUILayout.FlexibleSpace();
+
+            // Кнопки управления сценой
+            if (GUILayout.Button(EditorGUIUtility.IconContent("Settings"), iconButtonStyle))
+            {
+                // Логика изменения сцены
+            }
+
+            if (GUILayout.Button("X", iconButtonStyle))
+            {
+                // Логика удаления сцены
+            }
+
+            if (GUILayout.Button(EditorGUIUtility.IconContent("Download-Available"), iconButtonStyle))
+            {
+                // Логика сохранения сцены
+            }
+            
+            GUILayout.Space(20);
+            
+            GUILayout.EndHorizontal();
+
+            // Раскрытая часть сцены
+            if (sceneExpandedStates[sceneId])
+            {
+                var scripts = scene["scripts"] as JArray;
+                if (scripts.Count == 0)
+                {
+                    GUILayout.Label("В сцене еще нет диалогов...", centeredItalicLabelStyle);
+                    GUILayout.Space(18);
+                }
+
+                foreach (var script in scripts)
+                {
+                    GUILayout.BeginHorizontal();
+                    GUILayout.Space(20); // Отступ для вложенности
+                    if (GUILayout.Button((string)script["name"], scriptLabelStyle))
+                    {
+                        SwitchPage(Page.Main);
+                    }
+                    GUILayout.FlexibleSpace();
+
+                    // Кнопки управления диалогом
+                    if (GUILayout.Button(EditorGUIUtility.IconContent("Settings"), iconButtonStyle))
+                    {
+                        // Логика изменения диалога
+                    }
+
+                    if (GUILayout.Button("X", iconButtonStyle))
+                    {
+                        // Логика удаления диалога
+                    }
+
+                    GUILayout.Space(18);
+
+                    GUILayout.EndHorizontal();
+                }
+            }
+
+            GUILayout.EndVertical();
+            GUILayout.Space(10);
+        }
+    }
+
+    GUILayout.EndVertical();
+    GUILayout.EndScrollView();
+    GUILayout.EndArea();
+}
 
     private void ClearEditGamePageFields()
     {
