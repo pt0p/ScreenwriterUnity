@@ -4,10 +4,10 @@ using UnityEditor;
 using UnityEngine;
 using System.Collections.Generic;
 using Newtonsoft.Json.Linq;
+using System.Linq;
 
 public class PlotTalkAI : EditorWindow
 {
-    
     // pages
     public enum Page
     {
@@ -17,12 +17,13 @@ public class PlotTalkAI : EditorWindow
         GameDetail,
         EditGame,
         EditCharacters,
-        EditCharacter
+        EditCharacter,
+        EditScene
     }
 
     private Page currentPage = Page.Login;
     private Page previousPage = Page.Login;
-    
+
     // fields
     private string loginEmail = "";
     private string loginPassword = "";
@@ -40,6 +41,9 @@ public class PlotTalkAI : EditorWindow
     private string editCharacterTalkStyle;
     private string editCharacterLook;
     private string editCharacterExtra;
+    private string editSceneName;
+    private string editSceneDescription;
+    private JArray editSceneCharacters;
 
     // cashed styles
     private GUIStyle linkStyle;
@@ -71,9 +75,10 @@ public class PlotTalkAI : EditorWindow
     // selected objects
     private JObject selectedGame;
     private JObject selectedCharacter;
+    private JObject selectedScene;
 
     private bool pageInitialized;
-    
+
     private Dictionary<long, bool> sceneExpandedStates = new Dictionary<long, bool>();
 
     [MenuItem("Window/PlotTalkAI")]
@@ -128,6 +133,9 @@ public class PlotTalkAI : EditorWindow
             case Page.EditCharacter:
                 DrawEditCharacterPage();
                 break;
+            case Page.EditScene:
+                DrawEditScenePage();
+                break;
         }
 
         GUILayout.Space(20);
@@ -162,7 +170,7 @@ public class PlotTalkAI : EditorWindow
             normal = { textColor = textColor },
             wordWrap = true
         };
-        
+
         centeredItalicLabelStyle = new GUIStyle(EditorStyles.label)
         {
             alignment = TextAnchor.MiddleCenter,
@@ -243,7 +251,7 @@ public class PlotTalkAI : EditorWindow
             fontStyle = FontStyle.Bold,
             normal = { textColor = EditorGUIUtility.isProSkin ? Color.white : Color.black }
         };
-        
+
         // Стиль для кнопки со стрелкой
         arrowButtonStyle = new GUIStyle(EditorStyles.label)
         {
@@ -256,11 +264,11 @@ public class PlotTalkAI : EditorWindow
             fixedWidth = 20,
             fixedHeight = 20
         };
-        
+
         scriptLabelStyle = new GUIStyle(EditorStyles.label)
         {
             normal = { textColor = textColor },
-            hover = {textColor = new Color(0.75f, 0.75f, 0.75f)},
+            hover = { textColor = new Color(0.75f, 0.75f, 0.75f) },
             fontSize = 14,
         };
     }
@@ -384,7 +392,7 @@ public class PlotTalkAI : EditorWindow
 
         // Рассчитываем доступную ширину с учетом полосы прокрутки
         float availableWidth = position.width - 40;
-        int columns = Mathf.Max(1, Mathf.FloorToInt(availableWidth / 220));
+        int columns = Mathf.Max(1, Mathf.FloorToInt(availableWidth / 300));
         float cardWidth = (availableWidth - (columns - 1) * 20 - 70) / columns; // Вычитаем ширину полосы прокрутки
 
         scrollPosition = GUILayout.BeginScrollView(scrollPosition, false, false,
@@ -499,7 +507,7 @@ public class PlotTalkAI : EditorWindow
         }
 
 
-        if (GUILayout.Button("Персонажи", GUILayout.Height(30)))
+        if (GUILayout.Button($"Персонажи ({((JArray)game["characters"]).Count})", GUILayout.Height(30)))
         {
             selectedGame = game;
             SwitchPage(Page.EditCharacters);
@@ -611,7 +619,6 @@ public class PlotTalkAI : EditorWindow
                     {
                         ["name"] = editGameName,
                         ["genre"] = gameGenres[editGameGenre],
-                        ["characters"] = new JArray(),
                         ["tonality"] = gameTonalities[editGameTonality],
                         ["techLevel"] = gameTechLevels[editGameTechLevel],
                         ["description"] = editGameDescription
@@ -635,6 +642,7 @@ public class PlotTalkAI : EditorWindow
                     };
                     StorageApi.GetInstance().AddGame(newGame);
                     ClearEditGamePageFields();
+                    selectedGame = newGame; 
                     SwitchPage(Page.GameDetail);
                 }
             }
@@ -864,166 +872,327 @@ public class PlotTalkAI : EditorWindow
     }
 
     private void DrawGameDetailPage()
-{
-    if (selectedGame == null)
     {
-        SwitchPage(Page.Main);
-        return;
-    }
+        if (selectedGame == null)
+        {
+            SwitchPage(Page.Main);
+            return;
+        }
 
-    GUILayout.BeginArea(new Rect(
-        20,
-        20,
-        position.width - 40,
-        position.height - 40
-    ));
+        GUILayout.BeginArea(new Rect(
+            20,
+            20,
+            position.width - 50,
+            position.height - 20
+        ));
 
-    // Заголовок
-    GUILayout.Label($"Игра: {(string)selectedGame["name"]}", centeredLabelStyle);
-    GUILayout.Space(20);
+        // Заголовок
+        GUILayout.Label($"Игра: {(string)selectedGame["name"]}", centeredLabelStyle);
+        GUILayout.Space(20);
 
-    // Кнопки управления
-    if (GUILayout.Button("Назад", buttonStyle, GUILayout.Height(35)))
-    {
-        SwitchPage(Page.Main);
+        // Кнопки управления
+        if (GUILayout.Button("Назад", buttonStyle, GUILayout.Height(35)))
+        {
+            SwitchPage(Page.Main);
+        }
+
+        GUILayout.Space(10);
+
+        if (GUILayout.Button("Создать сцену", buttonStyle, GUILayout.Height(35)))
+        {
+            selectedScene = null;
+            SwitchPage(Page.EditScene);
+        }
+
+        GUILayout.Space(20);
+        
+        GUILayout.BeginHorizontal();
+
+        // Список сцен
+        scrollPosition =
+            GUILayout.BeginScrollView(scrollPosition, false, false, GUIStyle.none, GUI.skin.verticalScrollbar);
+        GUILayout.BeginVertical();
+
+        var scenes = selectedGame["scenes"] as JArray;
+        if (scenes != null)
+        {
+            for (int i = 0; i < scenes.Count; i++)
+            {
+                var scene = scenes[i];
+                long sceneId = (long)scene["id"];
+
+                // Инициализируем состояние, если нужно
+                if (!sceneExpandedStates.ContainsKey(sceneId))
+                {
+                    sceneExpandedStates[sceneId] = false;
+                }
+
+                GUILayout.BeginVertical();
+
+                // Заголовок сцены
+                GUILayout.BeginHorizontal(GUILayout.Height(50));
+
+                // Создаем область для кнопки со стрелкой с вертикальным выравниванием
+                GUILayout.BeginVertical(GUILayout.Width(20));
+                GUILayout.Space(8.5f);
+                // Кнопка раскрытия/скрытия с белой стрелкой
+                var arrowContent = new GUIContent(sceneExpandedStates[sceneId] ? "▼" : "►");
+                var arrowSize = GUI.skin.button.CalcSize(arrowContent);
+
+                if (GUILayout.Button(arrowContent, arrowButtonStyle, GUILayout.Width(20), GUILayout.Height(20)))
+                {
+                    sceneExpandedStates[sceneId] = !sceneExpandedStates[sceneId];
+                }
+
+                GUILayout.EndVertical();
+
+                if (GUILayout.Button((string)scene["name"], cardTitleStyle))
+                {
+                    sceneExpandedStates[sceneId] = !sceneExpandedStates[sceneId];
+                }
+
+                GUILayout.FlexibleSpace();
+
+                // Кнопки управления сценой
+                if (GUILayout.Button("+",
+                        new GUIStyle(iconButtonStyle) { fontSize = 18, padding = new RectOffset(8, 5, 5, 8) }))
+                {
+                    // Логика добавления диалога
+                }
+
+                if (GUILayout.Button(EditorGUIUtility.IconContent("Settings"), iconButtonStyle))
+                {
+                    selectedScene = (JObject)scene;
+                    SwitchPage(Page.EditScene);
+                }
+
+                if (GUILayout.Button("X", iconButtonStyle))
+                {
+                    if (EditorUtility.DisplayDialog("Вы уверены?",
+                            "Это действие необратимо. После того, как вы нажмете на кнопку \"OK\", сцена будет безвозвратно удалена.",
+                            "OK", "Отмена"))
+                    {
+                        StorageApi.GetInstance().DeleteScene((string)selectedGame["id"], sceneId);
+                        selectedGame = StorageApi.GetInstance().GetGameById((string)selectedGame["id"]);
+                    }
+                }
+
+                if (GUILayout.Button(EditorGUIUtility.IconContent("Download-Available"), iconButtonStyle))
+                {
+                    // Логика сохранения сцены
+                }
+
+                GUILayout.Space(5);
+
+                GUILayout.EndHorizontal();
+
+                // Раскрытая часть сцены
+                if (sceneExpandedStates[sceneId])
+                {
+                    var scripts = scene["scripts"] as JArray;
+                    if (scripts.Count == 0)
+                    {
+                        GUILayout.Label("В сцене еще нет диалогов...", centeredItalicLabelStyle);
+                        GUILayout.Space(18);
+                    }
+
+                    foreach (var script in scripts)
+                    {
+                        GUILayout.BeginHorizontal();
+                        GUILayout.Space(20); // Отступ для вложенности
+                        if (GUILayout.Button((string)script["name"], scriptLabelStyle))
+                        {
+                            SwitchPage(Page.Main);
+                        }
+
+                        GUILayout.FlexibleSpace();
+
+                        // Кнопки управления диалогом
+                        if (GUILayout.Button(EditorGUIUtility.IconContent("Settings"), iconButtonStyle))
+                        {
+                            // Логика изменения диалога
+                        }
+
+                        if (GUILayout.Button("X", iconButtonStyle))
+                        {
+                            if (EditorUtility.DisplayDialog("Вы уверены?",
+                                    "Это действие необратимо. После того, как вы нажмете на кнопку \"OK\", диалог будет безвозвратно удален.",
+                                    "OK", "Отмена"))
+                            {
+                                StorageApi.GetInstance()
+                                    .DeleteScript((string)selectedGame["id"], sceneId, (string)script["id"]);
+                                selectedGame = StorageApi.GetInstance().GetGameById((string)selectedGame["id"]);
+                            }
+                        }
+                        GUILayout.Space(3.5f);
+
+                        GUILayout.EndHorizontal();
+                    }
+                }
+
+                GUILayout.EndVertical();
+                GUILayout.Space(10);
+            }
+        }
+
+        GUILayout.EndVertical();
+        GUILayout.EndScrollView();
+        GUILayout.Space(10);
+        GUILayout.EndHorizontal();
+        GUILayout.Space(50);
+        GUILayout.EndArea();
     }
     
-    GUILayout.Space(10);
-
-    if (GUILayout.Button("Создать сцену", buttonStyle, GUILayout.Height(35)))
+    private void DrawEditScenePage()
     {
-        // Логика создания сцены
-    }
-
-    GUILayout.Space(20);
-
-    // Список сцен
-    scrollPosition = GUILayout.BeginScrollView(scrollPosition, false, false, GUIStyle.none, GUI.skin.verticalScrollbar);
-    GUILayout.BeginVertical();
-
-    var scenes = selectedGame["scenes"] as JArray;
-    if (scenes != null)
-    {
-        for (int i = 0; i < scenes.Count; i++)
+        if (!pageInitialized)
         {
-            var scene = scenes[i];
-            long sceneId = (long)scene["id"];
-            
-            // Инициализируем состояние, если нужно
-            if (!sceneExpandedStates.ContainsKey(sceneId))
+            if (selectedScene != null)
             {
-                sceneExpandedStates[sceneId] = false;
+                editSceneName = (string)selectedScene["name"];
+                editSceneDescription = (string)selectedScene["description"];
+                editSceneCharacters = (JArray)selectedScene["characters"];
             }
-
-            GUILayout.BeginVertical();
-
-            // Заголовок сцены
-            GUILayout.BeginHorizontal(GUILayout.Height(50));
-            
-            // Создаем область для кнопки со стрелкой с вертикальным выравниванием
-            GUILayout.BeginVertical(GUILayout.Width(20));
-            GUILayout.Space(8.5f);
-            // Кнопка раскрытия/скрытия с белой стрелкой
-            var arrowContent = new GUIContent(sceneExpandedStates[sceneId] ? "▼" : "►");
-            var arrowSize = GUI.skin.button.CalcSize(arrowContent);
-            
-            if (GUILayout.Button(arrowContent, arrowButtonStyle, GUILayout.Width(20), GUILayout.Height(20)))
+            else
             {
-                sceneExpandedStates[sceneId] = !sceneExpandedStates[sceneId];
+                ClearEditScenePageFields();
             }
-            
-            GUILayout.EndVertical();
-
-            if (GUILayout.Button((string)scene["name"], cardTitleStyle))
-            {
-                sceneExpandedStates[sceneId] = !sceneExpandedStates[sceneId];
-            }
-            GUILayout.FlexibleSpace();
-            
-            // Кнопки управления сценой
-            if (GUILayout.Button("+", new GUIStyle(iconButtonStyle){fontSize = 18, padding = new RectOffset(8, 5, 5, 8)}))
-            {
-                // Логика добавления диалога
-            }
-
-            if (GUILayout.Button(EditorGUIUtility.IconContent("Settings"), iconButtonStyle))
-            {
-                // Логика изменения сцены
-            }
-
-            if (GUILayout.Button("X", iconButtonStyle))
-            {
-                if (EditorUtility.DisplayDialog("Вы уверены?",
-                        "Это действие необратимо. После того, как вы нажмете на кнопку \"OK\", сцена будет безвозвратно удалена.",
-                        "OK", "Отмена"))
-                {
-                    StorageApi.GetInstance().DeleteScene((string)selectedGame["id"], sceneId);
-                    selectedGame = StorageApi.GetInstance().GetGameById((string)selectedGame["id"]);
-                }
-            }
-
-            if (GUILayout.Button(EditorGUIUtility.IconContent("Download-Available"), iconButtonStyle))
-            {
-                // Логика сохранения сцены
-            }
-            
-            GUILayout.Space(20);
-            
-            GUILayout.EndHorizontal();
-
-            // Раскрытая часть сцены
-            if (sceneExpandedStates[sceneId])
-            {
-                var scripts = scene["scripts"] as JArray;
-                if (scripts.Count == 0)
-                {
-                    GUILayout.Label("В сцене еще нет диалогов...", centeredItalicLabelStyle);
-                    GUILayout.Space(18);
-                }
-
-                foreach (var script in scripts)
-                {
-                    GUILayout.BeginHorizontal();
-                    GUILayout.Space(20); // Отступ для вложенности
-                    if (GUILayout.Button((string)script["name"], scriptLabelStyle))
-                    {
-                        SwitchPage(Page.Main);
-                    }
-                    GUILayout.FlexibleSpace();
-
-                    // Кнопки управления диалогом
-                    if (GUILayout.Button(EditorGUIUtility.IconContent("Settings"), iconButtonStyle))
-                    {
-                        // Логика изменения диалога
-                    }
-
-                    if (GUILayout.Button("X", iconButtonStyle))
-                    {
-                        if (EditorUtility.DisplayDialog("Вы уверены?",
-                                "Это действие необратимо. После того, как вы нажмете на кнопку \"OK\", диалог будет безвозвратно удален.",
-                                "OK", "Отмена"))
-                        {
-                            StorageApi.GetInstance()
-                                .DeleteScript((string)selectedGame["id"], sceneId, (string)script["id"]);
-                            selectedGame = StorageApi.GetInstance().GetGameById((string)selectedGame["id"]);
-                        }
-                    }
-
-                    GUILayout.Space(18);
-
-                    GUILayout.EndHorizontal();
-                }
-            }
-
-            GUILayout.EndVertical();
-            GUILayout.Space(10);
         }
+
+        pageInitialized = true;
+
+        GUILayout.BeginArea(new Rect(
+            (position.width - Mathf.Min(400, position.width - 40)) / 2,
+            20,
+            Mathf.Min(400, position.width * 0.8f),
+            position.height - 40
+        ));
+
+        GUILayout.BeginVertical();
+        GUILayout.Label("Сцена", centeredLabelStyle);
+        GUILayout.Space(30);
+
+        // Рассчитываем доступную высоту для ScrollView
+        float availableHeight = CalculateAvailableHeight(); // 120 - примерная высота заголовка и кнопок
+
+        // Начинаем ScrollView с фиксированной высотой
+        scrollPosition = GUILayout.BeginScrollView(scrollPosition, false, false,
+            GUIStyle.none, GUI.skin.verticalScrollbar,
+            GUILayout.Height(availableHeight));
+
+        GUILayout.Label("Название", fieldLabelStyle);
+        editSceneName = EditorGUILayout.TextField(editSceneName, textFieldStyle);
+
+        GUILayout.Space(15);
+
+        GUILayout.Label("Характеристики сцены", fieldLabelStyle);
+        editSceneDescription = EditorGUILayout.TextArea(editSceneDescription,
+            GUILayout.Height(60)); // Фиксированная высота для текстового поля
+        
+        GUILayout.Space(15);
+
+        GUILayout.Label("Персонажи", fieldLabelStyle);
+        var characters = StorageApi.GetInstance().GetCharactersArray(selectedGame);
+        if (characters.Count == 0)
+        {
+            GUILayout.Label("В игре еще нет персонажей...", centeredItalicLabelStyle);
+        }
+        foreach (var character in characters)
+        {
+            GUILayout.BeginHorizontal();
+            string charId = (string)character["id"];
+            bool isPresent = editSceneCharacters.Any(c => (string)c == charId);
+            bool newValue = EditorGUILayout.Toggle(isPresent, GUILayout.Width(20));
+    
+            if (newValue != isPresent)
+            {
+                if (newValue)
+                    editSceneCharacters.Add((string)character["id"]);
+                else
+                {
+                    var toRemove = editSceneCharacters.FirstOrDefault(c => (string)c == charId);
+                    if (toRemove != null)
+                        editSceneCharacters.Remove(toRemove);
+                }
+            }
+    
+            GUILayout.Label((string)character["name"]);
+            GUILayout.EndHorizontal();
+        }
+
+        GUILayout.Space(15);
+
+        GUILayout.EndScrollView();
+
+        GUILayout.Space(15);
+
+        GUILayout.Space(5);
+
+        if (GUILayout.Button("Сохранить", buttonStyle, GUILayout.Height(40)))
+        {
+            if (!string.IsNullOrEmpty(editSceneDescription) && !string.IsNullOrEmpty(editSceneName) && editSceneCharacters.Count > 0)
+            {
+                if (selectedScene != null)
+                {
+                    var updScene = new JObject
+                    {
+                        ["name"] = editSceneName,
+                        ["description"] = editSceneDescription,
+                        ["characters"] = editSceneCharacters
+                    };
+                    StorageApi.GetInstance().UpdateScene((string)selectedGame["id"], (long)selectedScene["id"], updScene);
+                    ClearEditScenePageFields();
+                    selectedScene = null;
+                    selectedGame = StorageApi.GetInstance().GetGameById((string)selectedGame["id"]);
+                    SwitchPage(Page.GameDetail);
+                }
+                else
+                {
+                    var newScene = new JObject
+                    {
+                        ["id"] = DateTimeOffset.Now.ToUnixTimeSeconds(),
+                        ["name"] = editSceneName,
+                        ["scripts"] = new JArray(),
+                        ["characters"] = editSceneCharacters,
+                        ["description"] = editSceneDescription
+                    };
+                    StorageApi.GetInstance().AddScene((string)selectedGame["id"], newScene);
+                    ClearEditScenePageFields();
+                    selectedScene = null;
+                    selectedGame = StorageApi.GetInstance().GetGameById((string)selectedGame["id"]);
+                    SwitchPage(Page.GameDetail);
+                }
+            }
+            else
+            {
+                EditorUtility.DisplayDialog("Ошибка", "Все поля обязательны для заполнения", "OK");
+            }
+        }
+
+        GUILayout.Space(5);
+
+        if (GUILayout.Button("Отменить", buttonStyle, GUILayout.Height(40)))
+        {
+            if (EditorUtility.DisplayDialog("Вы уверены?",
+                    "После того, как вы нажмете на кнопку \"Да\", все внесенные изменения сбросятся.",
+                    "Да", "Отмена"))
+            {
+                selectedScene = null;
+                ClearEditScenePageFields();
+                SwitchPage(Page.GameDetail);
+            }
+        }
+
+        GUILayout.EndVertical();
+        GUILayout.EndArea();
     }
 
-    GUILayout.EndVertical();
-    GUILayout.EndScrollView();
-    GUILayout.EndArea();
-}
+    private void ClearEditScenePageFields()
+    {
+        editSceneName = null;
+        editSceneDescription = null;
+        editSceneCharacters = new JArray();
+    }
 
     private void ClearEditGamePageFields()
     {
