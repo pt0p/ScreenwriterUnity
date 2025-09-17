@@ -18,36 +18,60 @@ public class PlotTalkAI : EditorWindow
         EditGame,
         EditCharacters,
         EditCharacter,
-        EditScene
+        EditScene,
+        EditScript
     }
 
     private Page currentPage = Page.Login;
-    private Page previousPage = Page.Login;
 
     // fields
+    // login
     private string loginEmail = "";
     private string loginPassword = "";
+    // register
     private string registerEmail = "";
     private string registerPassword = "";
     private string registerConfirm = "";
+    // edit game
     private string editGameName;
     private string editGameDescription;
     private int editGameGenre;
     private int editGameTechLevel;
     private int editGameTonality;
+    // edit character
     private string editCharacterName;
     private string editCharacterProfession;
     private string editCharacterTraits;
     private string editCharacterTalkStyle;
     private string editCharacterLook;
     private string editCharacterExtra;
+    // edit scene
     private string editSceneName;
     private string editSceneDescription;
     private JArray editSceneCharacters;
+    // edit script
+    private string editScriptName;
+    private int editScriptMinMainChar;
+    private int editScriptMaxMainChar;
+    private int editScriptMinDepth;
+    private int editScriptMaxDepth;
+    private string selectedMainCharacterId;
+    private string selectedNPCId;
+    private int toMainCharacterRelation;
+    private int toNpcRelation;
+    private string editScriptDescription;
+    private bool playerGetsInfo;
+    private bool playerGetsItem;
+    private string playerGetsInfoName;
+    private string playerGetsItemName;
+    private string playerGetsInfoCondition;
+    private string playerGetsItemCondition;
+    private string editScriptAdditional;
 
     // cashed styles
     private GUIStyle linkStyle;
     private GUIStyle centeredLabelStyle;
+    private GUIStyle centeredSmallLabelStyle;
     private GUIStyle centeredItalicLabelStyle;
     private GUIStyle fieldLabelStyle;
     private GUIStyle buttonStyle;
@@ -72,16 +96,19 @@ public class PlotTalkAI : EditorWindow
 
     private string[] gameTonalities = { "Нейтральная", "Героическая", "Трагическая", "Комическая", "Сказочная" };
 
+    private string[] scriptCharacterAttitude = { "Не знаком", "Хорошо", "Нейтрально", "Плохо" };
+    
     // selected objects
     private JObject selectedGame;
     private JObject selectedCharacter;
     private JObject selectedScene;
+    private JObject selectedScript;
 
     private bool pageInitialized;
 
     private Dictionary<long, bool> sceneExpandedStates = new Dictionary<long, bool>();
 
-    [MenuItem("Window/PlotTalkAI")]
+    [MenuItem("PlotTalkAI/PlotTalkAI")]
     public static void ShowWindow()
     {
         GetWindow<PlotTalkAI>("PlotTalkAI").minSize = new Vector2(450, 500);
@@ -136,6 +163,9 @@ public class PlotTalkAI : EditorWindow
             case Page.EditScene:
                 DrawEditScenePage();
                 break;
+            case Page.EditScript:
+                DrawEditScriptPage();
+                break;
         }
 
         GUILayout.Space(20);
@@ -166,6 +196,15 @@ public class PlotTalkAI : EditorWindow
         {
             alignment = TextAnchor.MiddleCenter,
             fontSize = 24,
+            fontStyle = FontStyle.Bold,
+            normal = { textColor = textColor },
+            wordWrap = true
+        };
+        
+        centeredSmallLabelStyle = new GUIStyle(EditorStyles.label)
+        {
+            alignment = TextAnchor.MiddleCenter,
+            fontSize = 20,
             fontStyle = FontStyle.Bold,
             normal = { textColor = textColor },
             wordWrap = true
@@ -514,7 +553,7 @@ public class PlotTalkAI : EditorWindow
         }
 
         // Кнопка настроек игры
-        if (GUILayout.Button(EditorGUIUtility.IconContent("Settings"), iconButtonStyle))
+        if (GUILayout.Button(EditorGUIUtility.IconContent("d_Settings"), iconButtonStyle))
         {
             selectedGame = game;
             SwitchPage(Page.EditGame);
@@ -587,25 +626,16 @@ public class PlotTalkAI : EditorWindow
         GUILayout.Label("Характеристики мира", fieldLabelStyle);
         editGameDescription = EditorGUILayout.TextArea(editGameDescription,
             GUILayout.Height(60)); // Фиксированная высота для текстового поля
-
-        GUILayout.Label("Жанр", fieldLabelStyle);
-        editGameGenre = EditorGUILayout.Popup(editGameGenre, gameGenres, textFieldStyle);
-
-        GUILayout.Space(15);
-
-        GUILayout.Label("Исторический период", fieldLabelStyle);
-        editGameTechLevel = EditorGUILayout.Popup(editGameTechLevel, gameTechLevels, textFieldStyle);
-
-        GUILayout.Space(15);
-
-        GUILayout.Label("Тональность", fieldLabelStyle);
-        editGameTonality = EditorGUILayout.Popup(editGameTonality, gameTonalities, textFieldStyle);
-
-        GUILayout.Space(15);
+        GUILayout.Space(5);
+        editGameGenre = EditorGUILayout.Popup("Жанр", editGameGenre, gameGenres);
+        GUILayout.Space(5);
+        editGameTechLevel = EditorGUILayout.Popup("Исторический период", editGameTechLevel, gameTechLevels);
+        GUILayout.Space(5);
+        editGameTonality = EditorGUILayout.Popup("Тональность", editGameTonality, gameTonalities);
 
         GUILayout.EndScrollView();
 
-        GUILayout.Space(15);
+        GUILayout.Space(15); 
 
         GUILayout.Space(5);
 
@@ -708,7 +738,7 @@ public class PlotTalkAI : EditorWindow
         GUILayout.Label((string)character["name"], centeredLabelStyle);
         GUILayout.Space(10);
 
-        if (GUILayout.Button(EditorGUIUtility.IconContent("Settings"), iconButtonStyle))
+        if (GUILayout.Button(EditorGUIUtility.IconContent("d_Settings"), iconButtonStyle))
         {
             selectedCharacter = (JObject)character;
             SwitchPage(Page.EditCharacter);
@@ -957,10 +987,12 @@ public class PlotTalkAI : EditorWindow
                 if (GUILayout.Button("+",
                         new GUIStyle(iconButtonStyle) { fontSize = 18, padding = new RectOffset(8, 5, 5, 8) }))
                 {
-                    // Логика добавления диалога
+                    selectedScript = null;
+                    selectedScene = (JObject)scene;
+                    SwitchPage(Page.EditScript);
                 }
 
-                if (GUILayout.Button(EditorGUIUtility.IconContent("Settings"), iconButtonStyle))
+                if (GUILayout.Button(EditorGUIUtility.IconContent("d_Settings"), iconButtonStyle))
                 {
                     selectedScene = (JObject)scene;
                     SwitchPage(Page.EditScene);
@@ -1008,9 +1040,11 @@ public class PlotTalkAI : EditorWindow
                         GUILayout.FlexibleSpace();
 
                         // Кнопки управления диалогом
-                        if (GUILayout.Button(EditorGUIUtility.IconContent("Settings"), iconButtonStyle))
+                        if (GUILayout.Button(EditorGUIUtility.IconContent("d_Settings"), iconButtonStyle))
                         {
-                            // Логика изменения диалога
+                            selectedScript = (JObject)script;
+                            selectedScene = (JObject)scene;
+                            SwitchPage(Page.EditScript);
                         }
 
                         if (GUILayout.Button("X", iconButtonStyle))
@@ -1186,6 +1220,307 @@ public class PlotTalkAI : EditorWindow
         GUILayout.EndVertical();
         GUILayout.EndArea();
     }
+    
+    private void DrawEditScriptPage()
+    {
+        if (!pageInitialized)
+        {
+            if (selectedScript != null)
+            {
+                editScriptName = (string)selectedScript["name"];
+                editScriptMinMainChar = (int)selectedScript["answers_from_m"];
+                editScriptMaxMainChar = (int)selectedScript["answers_to_m"];
+                editScriptMinDepth = (int)selectedScript["answers_from_n"];
+                editScriptMaxDepth = (int)selectedScript["answers_to_n"];
+                selectedMainCharacterId = (string)selectedScript["main_character"];
+                selectedNPCId = (string)selectedScript["npc"];
+                editScriptDescription = (string)selectedScript["description"];
+                playerGetsInfo = (bool)selectedScript["infoData"]["gets"];
+                playerGetsItem = (bool)selectedScript["itemData"]["gets"];
+                playerGetsInfoName = (string)selectedScript["infoData"]["name"];
+                playerGetsItemName = (string)selectedScript["itemData"]["name"];
+                playerGetsInfoCondition = (string)selectedScript["infoData"]["condition"];
+                playerGetsItemCondition = (string)selectedScript["itemData"]["condition"];
+                editScriptAdditional = (string)selectedScript["additional"];
+                toMainCharacterRelation = Array.IndexOf(scriptCharacterAttitude, (string)selectedScript["to_main_character_relations"]);
+                toNpcRelation = Array.IndexOf(scriptCharacterAttitude, ((string)selectedScript["to_npc_relations"]));
+            }
+            else
+            {
+                ClearEditScriptPageFields();
+            }
+        }
+
+        pageInitialized = true;
+
+        GUILayout.BeginArea(new Rect(
+            (position.width - Mathf.Min(400, position.width - 40)) / 2,
+            20,
+            Mathf.Min(400, position.width * 0.8f),
+            position.height - 40
+        ));
+
+        GUILayout.BeginVertical();
+        GUILayout.Label("Диалог", centeredLabelStyle);
+        GUILayout.Space(30);
+
+        // Рассчитываем доступную высоту для ScrollView
+        float availableHeight = CalculateAvailableHeight(); // 120 - примерная высота заголовка и кнопок
+
+        // Начинаем ScrollView с фиксированной высотой
+        scrollPosition = GUILayout.BeginScrollView(scrollPosition, false, false,
+            GUIStyle.none, GUI.skin.verticalScrollbar,
+            GUILayout.Height(availableHeight));
+
+        GUILayout.Label("Название", fieldLabelStyle);
+        editScriptName = EditorGUILayout.TextField(editScriptName, textFieldStyle);
+        
+        GUILayout.Space(30);
+        
+        GUILayout.Label("Ответы главного персонажа: от", fieldLabelStyle);
+        editScriptMinMainChar = EditorGUILayout.IntField(editScriptMinMainChar, textFieldStyle);
+        
+        GUILayout.Space(15);
+        
+        GUILayout.Label("до", fieldLabelStyle);
+        editScriptMaxMainChar = EditorGUILayout.IntField(editScriptMaxMainChar, textFieldStyle);
+        
+        GUILayout.Space(30);
+        
+        GUILayout.Label("Глубина дерева диалогов: от", fieldLabelStyle);
+        editScriptMinDepth = EditorGUILayout.IntField(editScriptMinDepth, textFieldStyle);
+        
+        GUILayout.Space(15);
+        
+        GUILayout.Label("до", fieldLabelStyle);
+        editScriptMaxDepth = EditorGUILayout.IntField(editScriptMaxDepth, textFieldStyle);
+
+        GUILayout.Space(30);
+        
+        GUILayout.Label("Персонажи", centeredSmallLabelStyle);
+        GUILayout.Space(5);
+        GUILayout.Label(" Главный персонаж", cardTitleStyle);
+        GUILayout.Space(5);
+        var sceneCharacterIds = ((JArray)selectedScene["characters"]).ToObject<string[]>();
+        var availableCharacters = ((JArray)selectedGame["characters"])
+            .Where(c => sceneCharacterIds.Contains((string)c["id"]))
+            .ToArray();
+
+        // Создаем массивы для отображения и соответствия
+        string[] characterNames = availableCharacters
+            .Select(c => (string)c["name"])
+            .ToArray();
+
+        string[] characterIds = availableCharacters
+            .Select(c => (string)c["id"])
+            .ToArray();
+
+        // Находим текущий индекс выбранного персонажа
+        int selectedMainCharacterIndex = Array.IndexOf(characterIds, selectedMainCharacterId);
+        if (selectedMainCharacterIndex == -1) selectedMainCharacterIndex = 0;
+        
+        int selectedNPCIndex = Array.IndexOf(characterIds, selectedNPCId);
+        if (selectedNPCIndex == -1) selectedNPCIndex = 0;
+        
+        // Отрисовка dropdown
+        selectedMainCharacterIndex = EditorGUILayout.Popup(selectedMainCharacterIndex, characterNames);
+        selectedMainCharacterId = characterIds[selectedMainCharacterIndex];
+        GUILayout.Space(5);
+        toNpcRelation = EditorGUILayout.Popup("Отношение к NPC", toNpcRelation, scriptCharacterAttitude);
+        GUILayout.Space(5);
+        GUILayout.Label(" NPC", cardTitleStyle);
+        GUILayout.Space(5);
+        // Отрисовка dropdown
+        selectedNPCIndex = EditorGUILayout.Popup(selectedNPCIndex, characterNames);
+        selectedNPCId = characterIds[selectedNPCIndex];
+        GUILayout.Space(5);
+        EditorGUILayout.BeginHorizontal();
+        GUILayout.Label("Отношение к главному персонажу");
+        toMainCharacterRelation = EditorGUILayout.Popup(toMainCharacterRelation, scriptCharacterAttitude);
+        GUILayout.FlexibleSpace();
+        EditorGUILayout.EndHorizontal();
+
+        GUILayout.Space(15);
+        GUILayout.Label("Краткое содержание", centeredSmallLabelStyle);
+        GUILayout.Space(15);
+        editScriptDescription = EditorGUILayout.TextArea(editScriptDescription,
+            GUILayout.Height(60));
+        GUILayout.Space(30);
+        
+        EditorGUILayout.BeginHorizontal();
+        GUILayout.Label("Персонаж получит предмет");
+        playerGetsItem = EditorGUILayout.Toggle(playerGetsItem, GUILayout.Width(20));
+        if (!playerGetsItem)
+        {
+            playerGetsItemName = "";
+            playerGetsItemCondition = "";
+        }
+        GUILayout.FlexibleSpace();
+        EditorGUILayout.EndHorizontal();
+        
+        EditorGUI.BeginDisabledGroup(!playerGetsItem);
+        
+        GUILayout.Label("Предмет", fieldLabelStyle);
+        playerGetsItemName = EditorGUILayout.TextField(playerGetsItemName, textFieldStyle);
+        GUILayout.Space(15);
+        GUILayout.Label("Условие достижения", fieldLabelStyle);
+        playerGetsItemCondition = EditorGUILayout.TextField(playerGetsItemCondition, textFieldStyle);
+        EditorGUI.EndDisabledGroup();
+        
+        GUILayout.Space(30);
+        
+        EditorGUILayout.BeginHorizontal();
+        GUILayout.Label("Персонаж получит информацию");
+        playerGetsInfo = EditorGUILayout.Toggle(playerGetsInfo, GUILayout.Width(20)); 
+        if (!playerGetsInfo)
+        {
+            playerGetsInfoName = "";
+            playerGetsInfoCondition = "";
+        }
+        GUILayout.FlexibleSpace();
+        EditorGUILayout.EndHorizontal();
+        
+        EditorGUI.BeginDisabledGroup(!playerGetsInfo);
+        
+        GUILayout.Label("Информация", fieldLabelStyle);
+        playerGetsInfoName = EditorGUILayout.TextField(playerGetsInfoName, textFieldStyle);
+        GUILayout.Space(15);
+        GUILayout.Label("Условие достижения", fieldLabelStyle);
+        playerGetsInfoCondition = EditorGUILayout.TextField(playerGetsInfoCondition, textFieldStyle);
+        
+        EditorGUI.EndDisabledGroup();
+        
+        GUILayout.Space(30);
+        GUILayout.Label("Дополнительно", centeredSmallLabelStyle);
+        GUILayout.Space(15);
+        editScriptAdditional = EditorGUILayout.TextArea(editScriptAdditional,
+            GUILayout.Height(60));
+        
+        GUILayout.Space(15);
+
+        GUILayout.EndScrollView();
+
+        GUILayout.Space(15);
+
+        if (GUILayout.Button("Сохранить", buttonStyle, GUILayout.Height(40)))
+        {
+            if (!string.IsNullOrEmpty(editScriptName) && editScriptMinMainChar > 0 && editScriptMaxMainChar > 0 && editScriptMinDepth > 0 && editScriptMaxDepth > 0 && !string.IsNullOrEmpty(editScriptDescription))
+            {
+                if (selectedScript != null)
+                {
+                    var updScript = new JObject
+                    {
+                        ["name"] = editScriptName,
+                        ["answers_from_m"] = editScriptMinMainChar,
+                        ["answers_to_m"] = editScriptMaxMainChar,
+                        ["answers_from_n"] = editScriptMinDepth,
+                        ["answers_to_n"] = editScriptMaxDepth,
+                        ["main_character"] = selectedMainCharacterId,
+                        ["npc"] = selectedNPCId,
+                        ["to_main_character_relations"] = scriptCharacterAttitude[toMainCharacterRelation],
+                        ["to_npc_relations"] = scriptCharacterAttitude[toNpcRelation],
+                        ["description"] = editScriptDescription,
+                        ["infoData"] = new JObject
+                        {
+                            ["gets"] = playerGetsInfo,
+                            ["name"] = playerGetsInfoName,
+                            ["condition"] = playerGetsInfoCondition,
+                        },
+                        ["itemData"] = new JObject
+                        {
+                            ["gets"] = playerGetsItem,
+                            ["name"] = playerGetsItemName,
+                            ["condition"] = playerGetsItemCondition,
+                        },
+                        ["additional"] = editScriptAdditional
+                    };
+                    StorageApi.GetInstance().UpdateScript((string)selectedGame["id"], (long)selectedScene["id"], (string)selectedScript["id"], updScript);
+                    ClearEditScriptPageFields();
+                    selectedScript = null;
+                    selectedGame = StorageApi.GetInstance().GetGameById((string)selectedGame["id"]);
+                    selectedScene = StorageApi.GetInstance().GetSceneById((string)selectedGame["id"], (long)selectedScene["id"]);
+                    SwitchPage(Page.GameDetail);
+                }
+                else
+                {
+                    var newScript = new JObject
+                    {
+                        ["id"] = DateTimeOffset.Now.ToUnixTimeSeconds().ToString(),
+                        ["result"] = new JObject(),
+                        ["name"] = editScriptName,
+                        ["answers_from_m"] = editScriptMinMainChar,
+                        ["answers_to_m"] = editScriptMaxMainChar,
+                        ["answers_from_n"] = editScriptMinDepth,
+                        ["answers_to_n"] = editScriptMaxDepth,
+                        ["main_character"] = selectedMainCharacterId,
+                        ["npc"] = selectedNPCId,
+                        ["to_main_character_relations"] = scriptCharacterAttitude[toMainCharacterRelation],
+                        ["to_npc_relations"] = scriptCharacterAttitude[toNpcRelation],
+                        ["description"] = editScriptDescription,
+                        ["infoData"] = new JObject
+                        {
+                            ["gets"] = playerGetsInfo,
+                            ["name"] = playerGetsInfoName,
+                            ["condition"] = playerGetsInfoCondition,
+                        },
+                        ["itemData"] = new JObject
+                        {
+                            ["gets"] = playerGetsItem,
+                            ["name"] = playerGetsItemName,
+                            ["condition"] = playerGetsItemCondition,
+                        },
+                        ["additional"] = editScriptAdditional
+                    };
+                    StorageApi.GetInstance().AddScript((string)selectedGame["id"], (long)selectedScene["id"], newScript);
+                    ClearEditScriptPageFields();
+                    selectedScript = null;
+                    selectedGame = StorageApi.GetInstance().GetGameById((string)selectedGame["id"]);
+                    selectedScene = StorageApi.GetInstance().GetSceneById((string)selectedGame["id"], (long)selectedScene["id"]);
+                    SwitchPage(Page.GameDetail);
+                }
+            }
+            else
+            {
+                EditorUtility.DisplayDialog("Ошибка", "Все поля обязательны для заполнения", "OK");
+            }
+        }
+
+        GUILayout.Space(5);
+
+        if (GUILayout.Button("Отменить", buttonStyle, GUILayout.Height(40)))
+        {
+            if (EditorUtility.DisplayDialog("Вы уверены?",
+                    "После того, как вы нажмете на кнопку \"Да\", все внесенные изменения сбросятся.",
+                    "Да", "Отмена"))
+            {
+                selectedScript = null;
+                ClearEditScriptPageFields();
+                SwitchPage(Page.GameDetail);
+            }
+        }
+
+        GUILayout.EndVertical();
+        GUILayout.EndArea();
+    }
+    
+    private void ClearEditScriptPageFields()
+    {
+        editScriptName = null;
+        editScriptMinMainChar = 0;
+        editScriptMaxMainChar = 0;
+        editScriptMinDepth = 0;
+        editScriptMaxDepth = 0;
+        selectedMainCharacterId = null;
+        selectedNPCId = null;
+        editScriptDescription = null;
+        playerGetsInfo = false;
+        playerGetsItem = false;
+        playerGetsInfoName = "";
+        playerGetsItemName = "";
+        playerGetsInfoCondition = ""; 
+        playerGetsItemCondition = "";
+        editScriptAdditional = null;
+    }
 
     private void ClearEditScenePageFields()
     {
@@ -1229,7 +1564,6 @@ public class PlotTalkAI : EditorWindow
 
     public void SwitchPage(Page page)
     {
-        previousPage = currentPage;
         scrollPosition = Vector2.zero;
         bool loggedIn = StorageApi.GetInstance().IsLoggedIn();
         if (page is Page.Register or Page.Login)
