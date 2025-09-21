@@ -1,10 +1,11 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
+using Newtonsoft.Json.Linq;
 using Plugins.PlotTalkAI.Utils;
 using UnityEditor;
 using UnityEngine;
-using System.Collections.Generic;
-using Newtonsoft.Json.Linq;
-using System.Linq;
+using Random = UnityEngine.Random;
 
 public class PlotTalkAI : EditorWindow
 {
@@ -19,100 +20,127 @@ public class PlotTalkAI : EditorWindow
         EditCharacters,
         EditCharacter,
         EditScene,
-        EditScript
+        EditScript,
+        GraphEditor
     }
 
+    private const float MIN_ZOOM = 0.3f;
+    private const float MAX_ZOOM = 2.0f;
+    private const float GRAPH_PADDING = 50f;
+    private GUIStyle addCardStyle;
+    private GUIStyle arrowButtonStyle;
+    private GUIStyle buttonStyle;
+    private GUIStyle lowButtonStyle;
+    private GUIStyle cardStyle;
+    private GUIStyle cardTitleStyle;
+    private GUIStyle centeredItalicLabelStyle;
+    private GUIStyle centeredLabelStyle;
+    private GUIStyle centeredSmallLabelStyle;
+
     private Page currentPage = Page.Login;
+    private Vector2 dragOffset;
+    private string editCharacterExtra;
+
+    private string editCharacterLook;
+
+    // edit character
+    private string editCharacterName;
+    private string editCharacterProfession;
+    private string editCharacterTalkStyle;
+    private string editCharacterTraits;
+    private string editGameDescription;
+
+    private int editGameGenre;
+
+    // edit game
+    private string editGameName;
+    private int editGameTechLevel;
+    private int editGameTonality;
+    private JObject editingNode;
+    private Vector2 editingNodeScroll;
+    private JArray editSceneCharacters;
+
+    private string editSceneDescription;
+
+    // edit scene
+    private string editSceneName;
+    private string editScriptAdditional;
+    private string editScriptDescription;
+    private int editScriptMaxDepth;
+    private int editScriptMaxMainChar;
+    private int editScriptMinDepth;
+
+    private int editScriptMinMainChar;
+
+    // edit script
+    private string editScriptName;
+    private GUIStyle fieldLabelStyle;
+
+    // dropdowns
+    private readonly string[] gameGenres =
+        { "Приключения", "Фэнтези", "Детектив", "Драма", "Комедия", "Ужасы", "Стратегия" };
+
+    private readonly string[] gameTechLevels =
+        { "Каменный век", "Средневековье", "Индустриальный", "Современность", "Будущее", "Другое" };
+
+    private readonly string[] gameTonalities =
+        { "Нейтральная", "Героическая", "Трагическая", "Комическая", "Сказочная" };
+
+    private Rect graphBounds;
+    private Vector2 graphPanOffset = Vector2.zero;
+    private Rect graphRect;
+    private float graphZoom = 1.0f;
+    private GUIStyle iconButtonStyle;
+
+    private bool isHoveringLink;
+    private bool isPanning;
+    private Vector2 lastMousePosition;
+
+    // cashed styles
+    private GUIStyle linkStyle;
 
     // fields
     // login
     private string loginEmail = "";
     private string loginPassword = "";
+
+    private bool pageInitialized;
+    private Vector2 panStart;
+    private bool playerGetsInfo;
+    private string playerGetsInfoCondition;
+    private string playerGetsInfoName;
+    private bool playerGetsItem;
+    private string playerGetsItemCondition;
+    private string playerGetsItemName;
+    private GUIStyle plusLabelStyle;
+    private GUIStyle plusStyle;
+
+    private string registerConfirm = "";
+
     // register
     private string registerEmail = "";
     private string registerPassword = "";
-    private string registerConfirm = "";
-    // edit game
-    private string editGameName;
-    private string editGameDescription;
-    private int editGameGenre;
-    private int editGameTechLevel;
-    private int editGameTonality;
-    // edit character
-    private string editCharacterName;
-    private string editCharacterProfession;
-    private string editCharacterTraits;
-    private string editCharacterTalkStyle;
-    private string editCharacterLook;
-    private string editCharacterExtra;
-    // edit scene
-    private string editSceneName;
-    private string editSceneDescription;
-    private JArray editSceneCharacters;
-    // edit script
-    private string editScriptName;
-    private int editScriptMinMainChar;
-    private int editScriptMaxMainChar;
-    private int editScriptMinDepth;
-    private int editScriptMaxDepth;
-    private string selectedMainCharacterId;
-    private string selectedNPCId;
-    private int toMainCharacterRelation;
-    private int toNpcRelation;
-    private string editScriptDescription;
-    private bool playerGetsInfo;
-    private bool playerGetsItem;
-    private string playerGetsInfoName;
-    private string playerGetsItemName;
-    private string playerGetsInfoCondition;
-    private string playerGetsItemCondition;
-    private string editScriptAdditional;
 
-    // cashed styles
-    private GUIStyle linkStyle;
-    private GUIStyle centeredLabelStyle;
-    private GUIStyle centeredSmallLabelStyle;
-    private GUIStyle centeredItalicLabelStyle;
-    private GUIStyle fieldLabelStyle;
-    private GUIStyle buttonStyle;
-    private GUIStyle textFieldStyle;
-    private GUIStyle cardStyle;
-    private GUIStyle addCardStyle;
-    private GUIStyle cardTitleStyle;
-    private GUIStyle iconButtonStyle;
-    private GUIStyle plusStyle;
-    private GUIStyle plusLabelStyle;
-    private GUIStyle arrowButtonStyle;
+    private readonly Dictionary<long, bool> sceneExpandedStates = new();
+
+    private readonly string[] scriptCharacterAttitude = { "Не знаком", "Хорошо", "Нейтрально", "Плохо" };
     private GUIStyle scriptLabelStyle;
-
-    private bool isHoveringLink = false;
     private Vector2 scrollPosition;
+    private JObject selectedCharacter;
 
-    // dropdowns
-    private string[] gameGenres = { "Приключения", "Фэнтези", "Детектив", "Драма", "Комедия", "Ужасы", "Стратегия" };
-
-    private string[] gameTechLevels =
-        { "Каменный век", "Средневековье", "Индустриальный", "Современность", "Будущее", "Другое" };
-
-    private string[] gameTonalities = { "Нейтральная", "Героическая", "Трагическая", "Комическая", "Сказочная" };
-
-    private string[] scriptCharacterAttitude = { "Не знаком", "Хорошо", "Нейтрально", "Плохо" };
-    
     // selected objects
     private JObject selectedGame;
-    private JObject selectedCharacter;
+    private string selectedMainCharacterId;
+
+    // graph data
+    private JObject selectedNode;
+    private string selectedNPCId;
     private JObject selectedScene;
     private JObject selectedScript;
-
-    private bool pageInitialized;
-
-    private Dictionary<long, bool> sceneExpandedStates = new Dictionary<long, bool>();
-
-    [MenuItem("PlotTalkAI/PlotTalkAI")]
-    public static void ShowWindow()
-    {
-        GetWindow<PlotTalkAI>("PlotTalkAI").minSize = new Vector2(450, 500);
-    }
+    private bool showNodeEditor;
+    private GUIStyle textFieldStyle;
+    private int toMainCharacterRelation;
+    private int toNpcRelation;
 
     private void OnEnable()
     {
@@ -122,7 +150,7 @@ public class PlotTalkAI : EditorWindow
 
     private void OnGUI()
     {
-        Color backgroundColor =
+        var backgroundColor =
             EditorGUIUtility.isProSkin ? new Color(0.22f, 0.22f, 0.22f) : new Color(0.76f, 0.76f, 0.76f);
 
         EditorGUI.DrawRect(new Rect(0, 0, position.width, position.height), backgroundColor);
@@ -166,6 +194,9 @@ public class PlotTalkAI : EditorWindow
             case Page.EditScript:
                 DrawEditScriptPage();
                 break;
+            case Page.GraphEditor:
+                DrawGraphEditorPage();
+                break;
         }
 
         GUILayout.Space(20);
@@ -179,10 +210,16 @@ public class PlotTalkAI : EditorWindow
         isHoveringLink = false;
     }
 
+    [MenuItem("PlotTalkAI/PlotTalkAI")]
+    public static void ShowWindow()
+    {
+        GetWindow<PlotTalkAI>("PlotTalkAI").minSize = new Vector2(450, 500);
+    }
+
     private void CreateStyles()
     {
-        Color textColor = EditorGUIUtility.isProSkin ? Color.white : Color.black;
-        Color linkColor = EditorGUIUtility.isProSkin ? new Color(0.85f, 0.85f, 0.85f) : new Color(0.1f, 0.3f, 0.8f);
+        var textColor = EditorGUIUtility.isProSkin ? Color.white : Color.black;
+        var linkColor = EditorGUIUtility.isProSkin ? new Color(0.85f, 0.85f, 0.85f) : new Color(0.1f, 0.3f, 0.8f);
 
         linkStyle = new GUIStyle(EditorStyles.label)
         {
@@ -200,7 +237,7 @@ public class PlotTalkAI : EditorWindow
             normal = { textColor = textColor },
             wordWrap = true
         };
-        
+
         centeredSmallLabelStyle = new GUIStyle(EditorStyles.label)
         {
             alignment = TextAnchor.MiddleCenter,
@@ -232,6 +269,11 @@ public class PlotTalkAI : EditorWindow
             alignment = TextAnchor.MiddleCenter,
             fontStyle = FontStyle.Bold,
             fixedHeight = 40
+        };
+        
+        lowButtonStyle = new GUIStyle(buttonStyle)
+        {
+            fixedHeight = 30
         };
 
         textFieldStyle = new GUIStyle(EditorStyles.textField)
@@ -308,7 +350,7 @@ public class PlotTalkAI : EditorWindow
         {
             normal = { textColor = textColor },
             hover = { textColor = new Color(0.75f, 0.75f, 0.75f) },
-            fontSize = 14,
+            fontSize = 14
         };
     }
 
@@ -334,7 +376,7 @@ public class PlotTalkAI : EditorWindow
         GUILayout.Space(25);
 
         // Кнопка "Войти"
-        Rect buttonRect = GUILayoutUtility.GetRect(GUIContent.none, buttonStyle, GUILayout.Height(40));
+        var buttonRect = GUILayoutUtility.GetRect(GUIContent.none, buttonStyle, GUILayout.Height(40));
         if (GUI.Button(buttonRect, "Войти", buttonStyle))
         {
             if (!string.IsNullOrEmpty(loginEmail) && loginPassword == "1234")
@@ -351,16 +393,10 @@ public class PlotTalkAI : EditorWindow
         GUILayout.Space(20);
 
         // Проверяем наведение на ссылку
-        Rect linkRect = GUILayoutUtility.GetRect(new GUIContent("Регистрация"), linkStyle);
-        if (GUI.Button(linkRect, "Регистрация", linkStyle))
-        {
-            SwitchPage(Page.Register);
-        }
+        var linkRect = GUILayoutUtility.GetRect(new GUIContent("Регистрация"), linkStyle);
+        if (GUI.Button(linkRect, "Регистрация", linkStyle)) SwitchPage(Page.Register);
 
-        if (linkRect.Contains(Event.current.mousePosition))
-        {
-            isHoveringLink = true;
-        }
+        if (linkRect.Contains(Event.current.mousePosition)) isHoveringLink = true;
 
         GUILayout.EndArea();
     }
@@ -392,13 +428,17 @@ public class PlotTalkAI : EditorWindow
         GUILayout.Space(25);
 
         // Кнопка "Зарегистрироваться"
-        Rect buttonRect = GUILayoutUtility.GetRect(GUIContent.none, buttonStyle, GUILayout.Height(40));
+        var buttonRect = GUILayoutUtility.GetRect(GUIContent.none, buttonStyle, GUILayout.Height(40));
         if (GUI.Button(buttonRect, "Зарегистрироваться", buttonStyle))
         {
             if (string.IsNullOrEmpty(registerEmail) || string.IsNullOrEmpty(registerPassword))
+            {
                 EditorUtility.DisplayDialog("Ошибка", "Заполните все поля", "OK");
+            }
             else if (registerPassword != registerConfirm)
+            {
                 EditorUtility.DisplayDialog("Ошибка", "Пароли не совпадают", "OK");
+            }
             else
             {
                 EditorUtility.DisplayDialog("Успех", "Регистрация прошла успешно", "OK");
@@ -409,16 +449,10 @@ public class PlotTalkAI : EditorWindow
         GUILayout.Space(20);
 
         // Проверяем наведение на ссылку
-        Rect linkRect = GUILayoutUtility.GetRect(new GUIContent("Назад"), linkStyle);
-        if (GUI.Button(linkRect, "Назад", linkStyle))
-        {
-            SwitchPage(Page.Login);
-        }
+        var linkRect = GUILayoutUtility.GetRect(new GUIContent("Назад"), linkStyle);
+        if (GUI.Button(linkRect, "Назад", linkStyle)) SwitchPage(Page.Login);
 
-        if (linkRect.Contains(Event.current.mousePosition))
-        {
-            isHoveringLink = true;
-        }
+        if (linkRect.Contains(Event.current.mousePosition)) isHoveringLink = true;
 
         GUILayout.EndArea();
     }
@@ -426,50 +460,42 @@ public class PlotTalkAI : EditorWindow
     private void DrawMainPage()
     {
         var games = StorageApi.GetInstance().GetGamesArray(StorageApi.GetInstance().LoadFullJson());
-        GUILayout.Label($"Добро пожаловать, ТутБудетИмя!", centeredLabelStyle);
+        GUILayout.Label("Добро пожаловать, ТутБудетИмя!", centeredLabelStyle);
         GUILayout.Space(30);
 
         // Рассчитываем доступную ширину с учетом полосы прокрутки
-        float availableWidth = position.width - 40;
-        int columns = Mathf.Max(1, Mathf.FloorToInt(availableWidth / 300));
-        float cardWidth = (availableWidth - (columns - 1) * 20 - 70) / columns; // Вычитаем ширину полосы прокрутки
+        var availableWidth = position.width - 40;
+        var columns = Mathf.Max(1, Mathf.FloorToInt(availableWidth / 300));
+        var cardWidth = (availableWidth - (columns - 1) * 20 - 70) / columns; // Вычитаем ширину полосы прокрутки
 
         scrollPosition = GUILayout.BeginScrollView(scrollPosition, false, false,
             GUIStyle.none, GUI.skin.verticalScrollbar, GUILayout.ExpandWidth(true));
 
-        int cardCount = games.Count + 1;
+        var cardCount = games.Count + 1;
 
         // Создаем сетку карточек
-        for (int i = 0; i < cardCount; i += columns)
+        for (var i = 0; i < cardCount; i += columns)
         {
             GUILayout.BeginHorizontal();
             GUILayout.Space(0); // Убираем любые отступы по умолчанию
 
-            for (int j = 0; j < columns; j++)
+            for (var j = 0; j < columns; j++)
             {
-                int index = i + j;
+                var index = i + j;
                 if (index >= cardCount) break;
 
                 if (j > 0) GUILayout.Space(20);
 
                 if (index == 0)
-                {
                     DrawCreateGameCard(cardWidth + 7, 120);
-                }
-                else if (index - 1 < games.Count)
-                {
-                    DrawGameCard((JObject)games[index - 1], cardWidth, 120);
-                }
+                else if (index - 1 < games.Count) DrawGameCard((JObject)games[index - 1], cardWidth, 120);
             }
 
             // Заполняем оставшееся пространство
             GUILayout.FlexibleSpace();
             GUILayout.EndHorizontal();
 
-            if (i + columns < cardCount)
-            {
-                GUILayout.Space(20);
-            }
+            if (i + columns < cardCount) GUILayout.Space(20);
         }
 
         GUILayout.EndScrollView();
@@ -477,7 +503,7 @@ public class PlotTalkAI : EditorWindow
         GUILayout.Space(20);
 
         // Кнопка "Выйти"
-        Rect buttonRect = GUILayoutUtility.GetRect(GUIContent.none, buttonStyle, GUILayout.Height(35));
+        var buttonRect = GUILayoutUtility.GetRect(GUIContent.none, buttonStyle, GUILayout.Height(35));
         if (GUI.Button(buttonRect, "Выйти", buttonStyle))
         {
             StorageApi.GetInstance().LogOut();
@@ -506,7 +532,7 @@ public class PlotTalkAI : EditorWindow
         GUILayout.EndVertical();
 
         // Обработка клика по карточке
-        Rect cardRect = GUILayoutUtility.GetLastRect();
+        var cardRect = GUILayoutUtility.GetLastRect();
         if (Event.current.type == EventType.MouseDown && cardRect.Contains(Event.current.mousePosition))
         {
             CreateNewGame();
@@ -529,8 +555,8 @@ public class PlotTalkAI : EditorWindow
         GUILayout.Label((string)game["name"], cardTitleStyle);
 
         // Описание игры с ограничением по высоте
-        float descriptionHeight = height - 100; // Вычитаем высоту заголовка и кнопок
-        Rect descriptionRect = GUILayoutUtility.GetRect(width - 30, descriptionHeight, EditorStyles.wordWrappedLabel);
+        var descriptionHeight = height - 100; // Вычитаем высоту заголовка и кнопок
+        var descriptionRect = GUILayoutUtility.GetRect(width - 30, descriptionHeight, EditorStyles.wordWrappedLabel);
         GUI.Label(descriptionRect, (string)game["description"], EditorStyles.wordWrappedLabel);
 
         GUILayout.FlexibleSpace();
@@ -560,14 +586,10 @@ public class PlotTalkAI : EditorWindow
         }
 
         if (GUILayout.Button("X", iconButtonStyle, GUILayout.Height(30)))
-        {
             if (EditorUtility.DisplayDialog("Вы уверены?",
                     "Это действие необратимо. После того, как вы нажмете на кнопку \"OK\", игра будет безвозвратно удалена.",
                     "OK", "Отмена"))
-            {
                 StorageApi.GetInstance().DeleteGame((string)game["id"]);
-            }
-        }
 
         GUILayout.EndHorizontal();
         GUILayout.EndVertical();
@@ -611,7 +633,7 @@ public class PlotTalkAI : EditorWindow
         GUILayout.Space(30);
 
         // Рассчитываем доступную высоту для ScrollView
-        float availableHeight = CalculateAvailableHeight(); // 120 - примерная высота заголовка и кнопок
+        var availableHeight = CalculateAvailableHeight(); // 120 - примерная высота заголовка и кнопок
 
         // Начинаем ScrollView с фиксированной высотой
         scrollPosition = GUILayout.BeginScrollView(scrollPosition, false, false,
@@ -635,7 +657,7 @@ public class PlotTalkAI : EditorWindow
 
         GUILayout.EndScrollView();
 
-        GUILayout.Space(15); 
+        GUILayout.Space(15);
 
         GUILayout.Space(5);
 
@@ -672,7 +694,7 @@ public class PlotTalkAI : EditorWindow
                     };
                     StorageApi.GetInstance().AddGame(newGame);
                     ClearEditGamePageFields();
-                    selectedGame = newGame; 
+                    selectedGame = newGame;
                     SwitchPage(Page.GameDetail);
                 }
             }
@@ -685,7 +707,6 @@ public class PlotTalkAI : EditorWindow
         GUILayout.Space(5);
 
         if (GUILayout.Button("Отменить", buttonStyle, GUILayout.Height(40)))
-        {
             if (EditorUtility.DisplayDialog("Вы уверены?",
                     "После того, как вы нажмете на кнопку \"Да\", все внесенные изменения сбросятся.",
                     "Да", "Отмена"))
@@ -694,7 +715,6 @@ public class PlotTalkAI : EditorWindow
                 ClearEditGamePageFields();
                 SwitchPage(Page.Main);
             }
-        }
 
         GUILayout.EndVertical();
         GUILayout.EndArea();
@@ -708,9 +728,7 @@ public class PlotTalkAI : EditorWindow
             GUILayout.BeginScrollView(scrollPosition, false, false, GUIStyle.none, GUI.skin.verticalScrollbar);
         GUILayout.BeginVertical();
         foreach (var character in StorageApi.GetInstance().GetCharactersArray(selectedGame))
-        {
             DrawCharacterCard(character);
-        }
 
         GUILayout.EndVertical();
         GUILayout.EndScrollView();
@@ -745,7 +763,6 @@ public class PlotTalkAI : EditorWindow
         }
 
         if (GUILayout.Button("X", iconButtonStyle, GUILayout.Height(30)))
-        {
             if (EditorUtility.DisplayDialog("Вы уверены?",
                     "Это действие необратимо. После того, как вы нажмете на кнопку \"OK\", персонаж будет безвозвратно удален.",
                     "OK", "Отмена"))
@@ -753,7 +770,6 @@ public class PlotTalkAI : EditorWindow
                 StorageApi.GetInstance().DeleteCharacter((string)selectedGame["id"], (string)character["id"]);
                 selectedGame = StorageApi.GetInstance().GetGameById((string)selectedGame["id"]);
             }
-        }
 
         GUILayout.EndHorizontal();
     }
@@ -791,7 +807,7 @@ public class PlotTalkAI : EditorWindow
         GUILayout.Space(30);
 
         // Рассчитываем доступную высоту для ScrollView
-        float availableHeight = CalculateAvailableHeight(); // 120 - примерная высота заголовка и кнопок
+        var availableHeight = CalculateAvailableHeight(); // 120 - примерная высота заголовка и кнопок
 
         // Начинаем ScrollView с фиксированной высотой
         scrollPosition = GUILayout.BeginScrollView(scrollPosition, false, false,
@@ -887,7 +903,6 @@ public class PlotTalkAI : EditorWindow
         GUILayout.Space(5);
 
         if (GUILayout.Button("Отменить", buttonStyle, GUILayout.Height(40)))
-        {
             if (EditorUtility.DisplayDialog("Вы уверены?",
                     "После того, как вы нажмете на кнопку \"Да\", все внесенные изменения сбросятся.",
                     "Да", "Отмена"))
@@ -895,7 +910,6 @@ public class PlotTalkAI : EditorWindow
                 selectedCharacter = null;
                 SwitchPage(Page.EditCharacters);
             }
-        }
 
         GUILayout.EndVertical();
         GUILayout.EndArea();
@@ -921,10 +935,7 @@ public class PlotTalkAI : EditorWindow
         GUILayout.Space(20);
 
         // Кнопки управления
-        if (GUILayout.Button("Назад", buttonStyle, GUILayout.Height(35)))
-        {
-            SwitchPage(Page.Main);
-        }
+        if (GUILayout.Button("Назад", buttonStyle, GUILayout.Height(35))) SwitchPage(Page.Main);
 
         GUILayout.Space(10);
 
@@ -935,7 +946,7 @@ public class PlotTalkAI : EditorWindow
         }
 
         GUILayout.Space(20);
-        
+
         GUILayout.BeginHorizontal();
 
         // Список сцен
@@ -945,17 +956,13 @@ public class PlotTalkAI : EditorWindow
 
         var scenes = selectedGame["scenes"] as JArray;
         if (scenes != null)
-        {
-            for (int i = 0; i < scenes.Count; i++)
+            for (var i = 0; i < scenes.Count; i++)
             {
                 var scene = scenes[i];
-                long sceneId = (long)scene["id"];
+                var sceneId = (long)scene["id"];
 
                 // Инициализируем состояние, если нужно
-                if (!sceneExpandedStates.ContainsKey(sceneId))
-                {
-                    sceneExpandedStates[sceneId] = false;
-                }
+                if (!sceneExpandedStates.ContainsKey(sceneId)) sceneExpandedStates[sceneId] = false;
 
                 GUILayout.BeginVertical();
 
@@ -970,16 +977,12 @@ public class PlotTalkAI : EditorWindow
                 var arrowSize = GUI.skin.button.CalcSize(arrowContent);
 
                 if (GUILayout.Button(arrowContent, arrowButtonStyle, GUILayout.Width(20), GUILayout.Height(20)))
-                {
                     sceneExpandedStates[sceneId] = !sceneExpandedStates[sceneId];
-                }
 
                 GUILayout.EndVertical();
 
                 if (GUILayout.Button((string)scene["name"], cardTitleStyle))
-                {
                     sceneExpandedStates[sceneId] = !sceneExpandedStates[sceneId];
-                }
 
                 GUILayout.FlexibleSpace();
 
@@ -999,7 +1002,6 @@ public class PlotTalkAI : EditorWindow
                 }
 
                 if (GUILayout.Button("X", iconButtonStyle))
-                {
                     if (EditorUtility.DisplayDialog("Вы уверены?",
                             "Это действие необратимо. После того, как вы нажмете на кнопку \"OK\", сцена будет безвозвратно удалена.",
                             "OK", "Отмена"))
@@ -1007,7 +1009,6 @@ public class PlotTalkAI : EditorWindow
                         StorageApi.GetInstance().DeleteScene((string)selectedGame["id"], sceneId);
                         selectedGame = StorageApi.GetInstance().GetGameById((string)selectedGame["id"]);
                     }
-                }
 
                 if (GUILayout.Button(EditorGUIUtility.IconContent("Download-Available"), iconButtonStyle))
                 {
@@ -1034,7 +1035,9 @@ public class PlotTalkAI : EditorWindow
                         GUILayout.Space(20); // Отступ для вложенности
                         if (GUILayout.Button((string)script["name"], scriptLabelStyle))
                         {
-                            SwitchPage(Page.Main);
+                            selectedScript = (JObject)script;
+                            selectedScene = (JObject)scene;
+                            SwitchPage(Page.GraphEditor);
                         }
 
                         GUILayout.FlexibleSpace();
@@ -1048,7 +1051,6 @@ public class PlotTalkAI : EditorWindow
                         }
 
                         if (GUILayout.Button("X", iconButtonStyle))
-                        {
                             if (EditorUtility.DisplayDialog("Вы уверены?",
                                     "Это действие необратимо. После того, как вы нажмете на кнопку \"OK\", диалог будет безвозвратно удален.",
                                     "OK", "Отмена"))
@@ -1057,7 +1059,7 @@ public class PlotTalkAI : EditorWindow
                                     .DeleteScript((string)selectedGame["id"], sceneId, (string)script["id"]);
                                 selectedGame = StorageApi.GetInstance().GetGameById((string)selectedGame["id"]);
                             }
-                        }
+
                         GUILayout.Space(3.5f);
 
                         GUILayout.EndHorizontal();
@@ -1067,7 +1069,6 @@ public class PlotTalkAI : EditorWindow
                 GUILayout.EndVertical();
                 GUILayout.Space(10);
             }
-        }
 
         GUILayout.EndVertical();
         GUILayout.EndScrollView();
@@ -1076,7 +1077,7 @@ public class PlotTalkAI : EditorWindow
         GUILayout.Space(50);
         GUILayout.EndArea();
     }
-    
+
     private void DrawEditScenePage()
     {
         if (!pageInitialized)
@@ -1107,7 +1108,7 @@ public class PlotTalkAI : EditorWindow
         GUILayout.Space(30);
 
         // Рассчитываем доступную высоту для ScrollView
-        float availableHeight = CalculateAvailableHeight(); // 120 - примерная высота заголовка и кнопок
+        var availableHeight = CalculateAvailableHeight(); // 120 - примерная высота заголовка и кнопок
 
         // Начинаем ScrollView с фиксированной высотой
         scrollPosition = GUILayout.BeginScrollView(scrollPosition, false, false,
@@ -1122,26 +1123,25 @@ public class PlotTalkAI : EditorWindow
         GUILayout.Label("Характеристики сцены", fieldLabelStyle);
         editSceneDescription = EditorGUILayout.TextArea(editSceneDescription,
             GUILayout.Height(60)); // Фиксированная высота для текстового поля
-        
+
         GUILayout.Space(15);
 
         GUILayout.Label("Персонажи", fieldLabelStyle);
         var characters = StorageApi.GetInstance().GetCharactersArray(selectedGame);
-        if (characters.Count == 0)
-        {
-            GUILayout.Label("В игре еще нет персонажей...", centeredItalicLabelStyle);
-        }
+        if (characters.Count == 0) GUILayout.Label("В игре еще нет персонажей...", centeredItalicLabelStyle);
         foreach (var character in characters)
         {
             GUILayout.BeginHorizontal();
-            string charId = (string)character["id"];
-            bool isPresent = editSceneCharacters.Any(c => (string)c == charId);
-            bool newValue = EditorGUILayout.Toggle(isPresent, GUILayout.Width(20));
-    
+            var charId = (string)character["id"];
+            var isPresent = editSceneCharacters.Any(c => (string)c == charId);
+            var newValue = EditorGUILayout.Toggle(isPresent, GUILayout.Width(20));
+
             if (newValue != isPresent)
             {
                 if (newValue)
+                {
                     editSceneCharacters.Add((string)character["id"]);
+                }
                 else
                 {
                     var toRemove = editSceneCharacters.FirstOrDefault(c => (string)c == charId);
@@ -1149,7 +1149,7 @@ public class PlotTalkAI : EditorWindow
                         editSceneCharacters.Remove(toRemove);
                 }
             }
-    
+
             GUILayout.Label((string)character["name"]);
             GUILayout.EndHorizontal();
         }
@@ -1164,7 +1164,8 @@ public class PlotTalkAI : EditorWindow
 
         if (GUILayout.Button("Сохранить", buttonStyle, GUILayout.Height(40)))
         {
-            if (!string.IsNullOrEmpty(editSceneDescription) && !string.IsNullOrEmpty(editSceneName) && editSceneCharacters.Count > 0)
+            if (!string.IsNullOrEmpty(editSceneDescription) && !string.IsNullOrEmpty(editSceneName) &&
+                editSceneCharacters.Count > 0)
             {
                 if (selectedScene != null)
                 {
@@ -1174,7 +1175,8 @@ public class PlotTalkAI : EditorWindow
                         ["description"] = editSceneDescription,
                         ["characters"] = editSceneCharacters
                     };
-                    StorageApi.GetInstance().UpdateScene((string)selectedGame["id"], (long)selectedScene["id"], updScene);
+                    StorageApi.GetInstance()
+                        .UpdateScene((string)selectedGame["id"], (long)selectedScene["id"], updScene);
                     ClearEditScenePageFields();
                     selectedScene = null;
                     selectedGame = StorageApi.GetInstance().GetGameById((string)selectedGame["id"]);
@@ -1206,7 +1208,6 @@ public class PlotTalkAI : EditorWindow
         GUILayout.Space(5);
 
         if (GUILayout.Button("Отменить", buttonStyle, GUILayout.Height(40)))
-        {
             if (EditorUtility.DisplayDialog("Вы уверены?",
                     "После того, как вы нажмете на кнопку \"Да\", все внесенные изменения сбросятся.",
                     "Да", "Отмена"))
@@ -1215,12 +1216,11 @@ public class PlotTalkAI : EditorWindow
                 ClearEditScenePageFields();
                 SwitchPage(Page.GameDetail);
             }
-        }
 
         GUILayout.EndVertical();
         GUILayout.EndArea();
     }
-    
+
     private void DrawEditScriptPage()
     {
         if (!pageInitialized)
@@ -1242,8 +1242,9 @@ public class PlotTalkAI : EditorWindow
                 playerGetsInfoCondition = (string)selectedScript["infoData"]["condition"];
                 playerGetsItemCondition = (string)selectedScript["itemData"]["condition"];
                 editScriptAdditional = (string)selectedScript["additional"];
-                toMainCharacterRelation = Array.IndexOf(scriptCharacterAttitude, (string)selectedScript["to_main_character_relations"]);
-                toNpcRelation = Array.IndexOf(scriptCharacterAttitude, ((string)selectedScript["to_npc_relations"]));
+                toMainCharacterRelation = Array.IndexOf(scriptCharacterAttitude,
+                    (string)selectedScript["to_main_character_relations"]);
+                toNpcRelation = Array.IndexOf(scriptCharacterAttitude, (string)selectedScript["to_npc_relations"]);
             }
             else
             {
@@ -1265,7 +1266,7 @@ public class PlotTalkAI : EditorWindow
         GUILayout.Space(30);
 
         // Рассчитываем доступную высоту для ScrollView
-        float availableHeight = CalculateAvailableHeight(); // 120 - примерная высота заголовка и кнопок
+        var availableHeight = CalculateAvailableHeight(); // 120 - примерная высота заголовка и кнопок
 
         // Начинаем ScrollView с фиксированной высотой
         scrollPosition = GUILayout.BeginScrollView(scrollPosition, false, false,
@@ -1274,29 +1275,29 @@ public class PlotTalkAI : EditorWindow
 
         GUILayout.Label("Название", fieldLabelStyle);
         editScriptName = EditorGUILayout.TextField(editScriptName, textFieldStyle);
-        
+
         GUILayout.Space(30);
-        
+
         GUILayout.Label("Ответы главного персонажа: от", fieldLabelStyle);
         editScriptMinMainChar = EditorGUILayout.IntField(editScriptMinMainChar, textFieldStyle);
-        
+
         GUILayout.Space(15);
-        
+
         GUILayout.Label("до", fieldLabelStyle);
         editScriptMaxMainChar = EditorGUILayout.IntField(editScriptMaxMainChar, textFieldStyle);
-        
+
         GUILayout.Space(30);
-        
+
         GUILayout.Label("Глубина дерева диалогов: от", fieldLabelStyle);
         editScriptMinDepth = EditorGUILayout.IntField(editScriptMinDepth, textFieldStyle);
-        
+
         GUILayout.Space(15);
-        
+
         GUILayout.Label("до", fieldLabelStyle);
         editScriptMaxDepth = EditorGUILayout.IntField(editScriptMaxDepth, textFieldStyle);
 
         GUILayout.Space(30);
-        
+
         GUILayout.Label("Персонажи", centeredSmallLabelStyle);
         GUILayout.Space(5);
         GUILayout.Label(" Главный персонаж", cardTitleStyle);
@@ -1307,21 +1308,21 @@ public class PlotTalkAI : EditorWindow
             .ToArray();
 
         // Создаем массивы для отображения и соответствия
-        string[] characterNames = availableCharacters
+        var characterNames = availableCharacters
             .Select(c => (string)c["name"])
             .ToArray();
 
-        string[] characterIds = availableCharacters
+        var characterIds = availableCharacters
             .Select(c => (string)c["id"])
             .ToArray();
 
         // Находим текущий индекс выбранного персонажа
-        int selectedMainCharacterIndex = Array.IndexOf(characterIds, selectedMainCharacterId);
+        var selectedMainCharacterIndex = Array.IndexOf(characterIds, selectedMainCharacterId);
         if (selectedMainCharacterIndex == -1) selectedMainCharacterIndex = 0;
-        
-        int selectedNPCIndex = Array.IndexOf(characterIds, selectedNPCId);
+
+        var selectedNPCIndex = Array.IndexOf(characterIds, selectedNPCId);
         if (selectedNPCIndex == -1) selectedNPCIndex = 0;
-        
+
         // Отрисовка dropdown
         selectedMainCharacterIndex = EditorGUILayout.Popup(selectedMainCharacterIndex, characterNames);
         selectedMainCharacterId = characterIds[selectedMainCharacterIndex];
@@ -1346,7 +1347,7 @@ public class PlotTalkAI : EditorWindow
         editScriptDescription = EditorGUILayout.TextArea(editScriptDescription,
             GUILayout.Height(60));
         GUILayout.Space(30);
-        
+
         EditorGUILayout.BeginHorizontal();
         GUILayout.Label("Персонаж получит предмет");
         playerGetsItem = EditorGUILayout.Toggle(playerGetsItem, GUILayout.Width(20));
@@ -1355,47 +1356,49 @@ public class PlotTalkAI : EditorWindow
             playerGetsItemName = "";
             playerGetsItemCondition = "";
         }
+
         GUILayout.FlexibleSpace();
         EditorGUILayout.EndHorizontal();
-        
+
         EditorGUI.BeginDisabledGroup(!playerGetsItem);
-        
+
         GUILayout.Label("Предмет", fieldLabelStyle);
         playerGetsItemName = EditorGUILayout.TextField(playerGetsItemName, textFieldStyle);
         GUILayout.Space(15);
         GUILayout.Label("Условие достижения", fieldLabelStyle);
         playerGetsItemCondition = EditorGUILayout.TextField(playerGetsItemCondition, textFieldStyle);
         EditorGUI.EndDisabledGroup();
-        
+
         GUILayout.Space(30);
-        
+
         EditorGUILayout.BeginHorizontal();
         GUILayout.Label("Персонаж получит информацию");
-        playerGetsInfo = EditorGUILayout.Toggle(playerGetsInfo, GUILayout.Width(20)); 
+        playerGetsInfo = EditorGUILayout.Toggle(playerGetsInfo, GUILayout.Width(20));
         if (!playerGetsInfo)
         {
             playerGetsInfoName = "";
             playerGetsInfoCondition = "";
         }
+
         GUILayout.FlexibleSpace();
         EditorGUILayout.EndHorizontal();
-        
+
         EditorGUI.BeginDisabledGroup(!playerGetsInfo);
-        
+
         GUILayout.Label("Информация", fieldLabelStyle);
         playerGetsInfoName = EditorGUILayout.TextField(playerGetsInfoName, textFieldStyle);
         GUILayout.Space(15);
         GUILayout.Label("Условие достижения", fieldLabelStyle);
         playerGetsInfoCondition = EditorGUILayout.TextField(playerGetsInfoCondition, textFieldStyle);
-        
+
         EditorGUI.EndDisabledGroup();
-        
+
         GUILayout.Space(30);
         GUILayout.Label("Дополнительно", centeredSmallLabelStyle);
         GUILayout.Space(15);
         editScriptAdditional = EditorGUILayout.TextArea(editScriptAdditional,
             GUILayout.Height(60));
-        
+
         GUILayout.Space(15);
 
         GUILayout.EndScrollView();
@@ -1404,7 +1407,8 @@ public class PlotTalkAI : EditorWindow
 
         if (GUILayout.Button("Сохранить", buttonStyle, GUILayout.Height(40)))
         {
-            if (!string.IsNullOrEmpty(editScriptName) && editScriptMinMainChar > 0 && editScriptMaxMainChar > 0 && editScriptMinDepth > 0 && editScriptMaxDepth > 0 && !string.IsNullOrEmpty(editScriptDescription))
+            if (!string.IsNullOrEmpty(editScriptName) && editScriptMinMainChar > 0 && editScriptMaxMainChar > 0 &&
+                editScriptMinDepth > 0 && editScriptMaxDepth > 0 && !string.IsNullOrEmpty(editScriptDescription))
             {
                 if (selectedScript != null)
                 {
@@ -1424,21 +1428,23 @@ public class PlotTalkAI : EditorWindow
                         {
                             ["gets"] = playerGetsInfo,
                             ["name"] = playerGetsInfoName,
-                            ["condition"] = playerGetsInfoCondition,
+                            ["condition"] = playerGetsInfoCondition
                         },
                         ["itemData"] = new JObject
                         {
                             ["gets"] = playerGetsItem,
                             ["name"] = playerGetsItemName,
-                            ["condition"] = playerGetsItemCondition,
+                            ["condition"] = playerGetsItemCondition
                         },
                         ["additional"] = editScriptAdditional
                     };
-                    StorageApi.GetInstance().UpdateScript((string)selectedGame["id"], (long)selectedScene["id"], (string)selectedScript["id"], updScript);
+                    StorageApi.GetInstance().UpdateScript((string)selectedGame["id"], (long)selectedScene["id"],
+                        (string)selectedScript["id"], updScript);
                     ClearEditScriptPageFields();
                     selectedScript = null;
                     selectedGame = StorageApi.GetInstance().GetGameById((string)selectedGame["id"]);
-                    selectedScene = StorageApi.GetInstance().GetSceneById((string)selectedGame["id"], (long)selectedScene["id"]);
+                    selectedScene = StorageApi.GetInstance()
+                        .GetSceneById((string)selectedGame["id"], (long)selectedScene["id"]);
                     SwitchPage(Page.GameDetail);
                 }
                 else
@@ -1461,21 +1467,23 @@ public class PlotTalkAI : EditorWindow
                         {
                             ["gets"] = playerGetsInfo,
                             ["name"] = playerGetsInfoName,
-                            ["condition"] = playerGetsInfoCondition,
+                            ["condition"] = playerGetsInfoCondition
                         },
                         ["itemData"] = new JObject
                         {
                             ["gets"] = playerGetsItem,
                             ["name"] = playerGetsItemName,
-                            ["condition"] = playerGetsItemCondition,
+                            ["condition"] = playerGetsItemCondition
                         },
                         ["additional"] = editScriptAdditional
                     };
-                    StorageApi.GetInstance().AddScript((string)selectedGame["id"], (long)selectedScene["id"], newScript);
+                    StorageApi.GetInstance()
+                        .AddScript((string)selectedGame["id"], (long)selectedScene["id"], newScript);
                     ClearEditScriptPageFields();
                     selectedScript = null;
                     selectedGame = StorageApi.GetInstance().GetGameById((string)selectedGame["id"]);
-                    selectedScene = StorageApi.GetInstance().GetSceneById((string)selectedGame["id"], (long)selectedScene["id"]);
+                    selectedScene = StorageApi.GetInstance()
+                        .GetSceneById((string)selectedGame["id"], (long)selectedScene["id"]);
                     SwitchPage(Page.GameDetail);
                 }
             }
@@ -1488,7 +1496,6 @@ public class PlotTalkAI : EditorWindow
         GUILayout.Space(5);
 
         if (GUILayout.Button("Отменить", buttonStyle, GUILayout.Height(40)))
-        {
             if (EditorUtility.DisplayDialog("Вы уверены?",
                     "После того, как вы нажмете на кнопку \"Да\", все внесенные изменения сбросятся.",
                     "Да", "Отмена"))
@@ -1497,12 +1504,542 @@ public class PlotTalkAI : EditorWindow
                 ClearEditScriptPageFields();
                 SwitchPage(Page.GameDetail);
             }
-        }
 
         GUILayout.EndVertical();
         GUILayout.EndArea();
     }
-    
+
+    private void DrawGraphEditorPage()
+    {
+        // Заголовок и элементы управления
+        GUILayout.BeginHorizontal(EditorStyles.helpBox);
+        GUILayout.Space(5);
+        GUILayout.BeginVertical();
+        GUILayout.Space(5);
+        if (GUILayout.Button("Назад", buttonStyle, GUILayout.Height(40)))
+        {
+            if (EditorUtility.DisplayDialog("Вы уверены?", "Все несохраненные изменения будут сброшены!", "Да, выйти",
+                    "Отмена"))
+            {
+                selectedScript = null;
+                selectedGame = StorageApi.GetInstance().GetGameById((string)selectedGame["id"]);
+                selectedScene = StorageApi.GetInstance().GetSceneById((string)selectedGame["id"], (long)selectedScene["id"]);
+                SwitchPage(Page.GameDetail);
+            }
+        }
+        GUILayout.Space(5);
+
+        if (selectedScript != null)
+        {
+            GUILayout.Label(selectedScript["name"]?.ToString(), centeredLabelStyle);
+            GUILayout.Space(5);
+
+            GUILayout.BeginHorizontal();
+            if (GUILayout.Button(EditorGUIUtility.IconContent("d_back"), iconButtonStyle))
+            {
+                // Логика для кнопки "Назад"
+            }
+
+            if (GUILayout.Button(EditorGUIUtility.IconContent("d_forward"), iconButtonStyle))
+            {
+                // Логика для кнопки "Вперед"
+            }
+
+            GUILayout.FlexibleSpace();
+
+            if (GUILayout.Button("Сохранить", lowButtonStyle, GUILayout.Height(30)))
+            {
+                StorageApi.GetInstance().UpdateScript(
+                    (string)selectedGame["id"],
+                    (long)selectedScene["id"],
+                    (string)selectedScript["id"],
+                    selectedScript
+                );
+            }
+        }
+
+        GUILayout.FlexibleSpace();
+
+        if (GUILayout.Button(EditorGUIUtility.IconContent("d_Refresh"), iconButtonStyle)) ResetGraphView();
+        GUILayout.EndHorizontal();
+        GUILayout.Space(5);
+        GUILayout.EndVertical();
+        GUILayout.Space(5);
+        GUILayout.EndHorizontal();
+
+        // Получаем Rect для элементов управления
+        var controlRect = GUILayoutUtility.GetLastRect();
+
+        // Область графа занимает всё оставшееся пространство
+        graphRect = new Rect(
+            0,
+            controlRect.y + controlRect.height,
+            position.width,
+            position.height - (controlRect.y + controlRect.height)
+        );
+
+        // Обработка ввода для графа
+        HandleGraphInput();
+
+        // Отображение графа
+        GUI.BeginClip(graphRect);
+
+        // Рассчитываем границы графа
+        CalculateGraphBounds();
+
+        // Отрисовка содержимого графа
+        DrawGraphContent();
+
+        GUI.EndClip();
+
+        // Окно редактирования узла
+        if (showNodeEditor && editingNode != null) DrawNodeEditorWindow();
+
+        // Отображение информации о масштабе
+        GUI.Label(new Rect(10, position.height - 40, 200, 20), $"Масштаб: {graphZoom * 100:0}%");
+    }
+
+    private void HandleGraphInput()
+    {
+        var e = Event.current;
+        var mousePos = e.mousePosition;
+
+        // Проверяем, находится ли курсор в области графа
+        if (!graphRect.Contains(mousePos))
+            return;
+
+        // Масштабирование колесом мыши
+        if (e.type == EventType.ScrollWheel)
+        {
+            var zoomChange = -e.delta.y * 0.01f;
+            var oldZoom = graphZoom;
+            graphZoom = Mathf.Clamp(graphZoom + zoomChange, MIN_ZOOM, MAX_ZOOM);
+
+            // Корректируем позицию для сохранения точки под курсором
+            var localMousePos = (mousePos - graphRect.position - graphPanOffset) / oldZoom;
+            graphPanOffset = mousePos - graphRect.position - localMousePos * graphZoom;
+
+            e.Use();
+            Repaint();
+        }
+
+        // Начало панорамирования
+        if (e.type == EventType.MouseDown && (e.button == 1 || e.button == 2))
+        {
+            isPanning = true;
+            panStart = mousePos;
+            lastMousePosition = mousePos;
+            e.Use();
+        }
+
+        // Панорамирование
+        if (e.type == EventType.MouseDrag && isPanning)
+        {
+            graphPanOffset += e.delta;
+            e.Use();
+            Repaint();
+        }
+
+        // Завершение панорамирования
+        if (e.type == EventType.MouseUp && (e.button == 1 || e.button == 2))
+        {
+            isPanning = false;
+            e.Use();
+        }
+
+        // Преобразуем координаты мыши в координаты графа
+        var graphMousePos = (mousePos - graphRect.position - graphPanOffset) / graphZoom;
+
+        // Начало перетаскивания узла
+        if (e.type == EventType.MouseDown && e.button == 0)
+        {
+            // Ищем узел под курсором
+            var nodes = (JArray)selectedScript["result"]["data"];
+            if (nodes != null)
+                foreach (JObject node in nodes)
+                {
+                    var nodePos = GetNodePosition(node);
+                    var nodeRect = new Rect(nodePos.x, nodePos.y, 180, 50);
+
+                    if (nodeRect.Contains(graphMousePos))
+                    {
+                        selectedNode = node;
+                        // Правильно рассчитываем смещение с учетом масштаба
+                        dragOffset = graphMousePos - nodePos;
+                        e.Use();
+                        break;
+                    }
+                }
+        }
+
+        // Перетаскивание узла
+        if (e.type == EventType.MouseDrag && e.button == 0 && selectedNode != null)
+        {
+            var newPos = graphMousePos - dragOffset;
+
+            if (selectedNode["meta"] == null)
+                selectedNode["meta"] = new JObject();
+
+            selectedNode["meta"]["x"] = newPos.x;
+            selectedNode["meta"]["y"] = newPos.y;
+
+            e.Use();
+            Repaint();
+        }
+
+        // Завершение перетаскивания узла
+        if (e.type == EventType.MouseUp && e.button == 0)
+        {
+            selectedNode = null;
+            e.Use();
+        }
+    }
+
+    private void DrawGraphContent()
+    {
+        if(selectedScript == null) return;
+        
+        if (selectedScript["result"] == null || !selectedScript["result"].HasValues)
+        {
+            var messagePos = new Vector2(graphRect.width / 2 - 100, graphRect.height / 2 - 10);
+            GUI.Label(new Rect(messagePos, new Vector2(200, 20)), "Диалог еще генерируется...",
+                centeredItalicLabelStyle);
+            return;
+        }
+
+        var nodes = (JArray)selectedScript["result"]["data"];
+        if (nodes == null) return;
+
+        // Отрисовка связей
+        foreach (JObject node in nodes)
+        {
+            var fromId = (int)node["id"];
+            var fromPos = GetNodePosition(node);
+            var fromScreen = new Vector2(
+                fromPos.x * graphZoom + graphPanOffset.x + 90 * graphZoom,
+                fromPos.y * graphZoom + graphPanOffset.y + 25 * graphZoom
+            );
+
+            foreach (JObject link in node["to"])
+            {
+                var toId = (int)link["id"];
+                var toNode = nodes.FirstOrDefault(n => (int)n["id"] == toId) as JObject;
+                if (toNode != null)
+                {
+                    var toPos = GetNodePosition(toNode);
+                    var toScreen = new Vector2(
+                        toPos.x * graphZoom + graphPanOffset.x + 90 * graphZoom,
+                        toPos.y * graphZoom + graphPanOffset.y + 25 * graphZoom
+                    );
+
+                    Handles.BeginGUI();
+                    Handles.color = Color.blue;
+                    Handles.DrawAAPolyLine(3f, fromScreen, toScreen);
+
+                    // Рисуем стрелку
+                    var dir = (toScreen - fromScreen).normalized;
+                    Vector2 right = Quaternion.Euler(0, 0, 30) * dir * 10;
+                    Vector2 left = Quaternion.Euler(0, 0, -30) * dir * 10;
+                    Handles.DrawAAConvexPolygon(toScreen, toScreen - right, toScreen - left);
+                    Handles.EndGUI();
+                }
+            }
+        }
+
+        // Отрисовка узлов
+        foreach (JObject node in nodes)
+        {
+            var nodePos = GetNodePosition(node);
+            var nodeRect = new Rect(
+                nodePos.x * graphZoom + graphPanOffset.x,
+                nodePos.y * graphZoom + graphPanOffset.y,
+                180 * graphZoom,
+                50 * graphZoom
+            );
+
+            if (IsNodeVisible(nodeRect, new Rect(0, 0, graphRect.width, graphRect.height)))
+            {
+                var nodeStyle = new GUIStyle(EditorStyles.helpBox);
+                nodeStyle.wordWrap = true;
+                switch (node["type"].ToString())
+                {
+                    case "M": nodeStyle.normal.background = MakeTex(2, 2, new Color(0.8f, 0.8f, 1f)); break;
+                    case "C": nodeStyle.normal.background = MakeTex(2, 2, new Color(0.8f, 1f, 0.8f)); break;
+                    case "P": nodeStyle.normal.background = MakeTex(2, 2, new Color(1f, 0.8f, 0.8f)); break;
+                }
+
+                // Отрисовка узла
+                GUI.Box(nodeRect, node["line"].ToString(), nodeStyle);
+
+                // Обработка двойного клика для редактирования
+                if (Event.current.type == EventType.MouseDown &&
+                    Event.current.clickCount == 2 &&
+                    nodeRect.Contains(Event.current.mousePosition - graphRect.position))
+                {
+                    editingNode = node;
+                    showNodeEditor = true;
+                    Event.current.Use();
+                }
+            }
+        }
+    }
+
+    private Vector2 GetNodePosition(JObject node)
+    {
+        if (node["meta"] == null)
+        {
+            node["meta"] = new JObject();
+            node["meta"]["x"] = Random.Range(50, 500);
+            node["meta"]["y"] = Random.Range(50, 500);
+        }
+
+        return new Vector2(
+            (float)(node["meta"]["x"] ?? 0),
+            (float)(node["meta"]["y"] ?? 0)
+        );
+    }
+
+    private bool IsNodeVisible(Rect nodeRect, Rect visibleArea)
+    {
+        return nodeRect.Overlaps(visibleArea);
+    }
+
+    private bool IsLineVisible(Vector2 start, Vector2 end, Rect visibleArea)
+    {
+        // Простая проверка: линия видна, если хотя бы одна точка находится в видимой области
+        return visibleArea.Contains(start) || visibleArea.Contains(end) ||
+               LineIntersectsRect(start, end, visibleArea);
+    }
+
+    private void ResetGraphView()
+    {
+        CalculateGraphBounds();
+
+        if (graphBounds.width == 0 || graphBounds.height == 0)
+        {
+            graphZoom = 1.0f;
+            graphPanOffset = Vector2.zero;
+            return;
+        }
+
+        // Вычисляем zoom, который поместит весь граф в view
+        var zoomX = graphRect.width / graphBounds.width;
+        var zoomY = graphRect.height / graphBounds.height;
+        graphZoom = Mathf.Min(zoomX, zoomY, 1.0f);
+
+        // Центрируем граф
+        graphPanOffset = new Vector2(
+            (graphRect.width - graphBounds.width * graphZoom) / 2,
+            (graphRect.height - graphBounds.height * graphZoom) / 2
+        );
+
+        Repaint();
+    }
+
+    private bool LineIntersectsRect(Vector2 start, Vector2 end, Rect rect)
+    {
+        // Проверяем пересечение линии с прямоугольником
+        return LineIntersectsLine(start, end, new Vector2(rect.x, rect.y), new Vector2(rect.x + rect.width, rect.y)) ||
+               LineIntersectsLine(start, end, new Vector2(rect.x + rect.width, rect.y),
+                   new Vector2(rect.x + rect.width, rect.y + rect.height)) ||
+               LineIntersectsLine(start, end, new Vector2(rect.x + rect.width, rect.y + rect.height),
+                   new Vector2(rect.x, rect.y + rect.height)) ||
+               LineIntersectsLine(start, end, new Vector2(rect.x, rect.y + rect.height), new Vector2(rect.x, rect.y));
+    }
+
+    private bool LineIntersectsLine(Vector2 a1, Vector2 a2, Vector2 b1, Vector2 b2)
+    {
+        // Проверяем пересечение двух линий
+        var b = a2 - a1;
+        var d = b2 - b1;
+        var bDotDPerp = b.x * d.y - b.y * d.x;
+
+        if (bDotDPerp == 0)
+            return false;
+
+        var c = b1 - a1;
+        var t = (c.x * d.y - c.y * d.x) / bDotDPerp;
+        if (t < 0 || t > 1)
+            return false;
+
+        var u = (c.x * b.y - c.y * b.x) / bDotDPerp;
+        if (u < 0 || u > 1)
+            return false;
+
+        return true;
+    }
+
+    private void SetNodePosition(JObject node, Vector2 position)
+    {
+        if (node["meta"] == null)
+            node["meta"] = new JObject();
+
+        node["meta"]["x"] = position.x;
+        node["meta"]["y"] = position.y;
+    }
+
+    private void DrawNodeEditorWindow()
+    {
+        if (editingNode == null) return;
+
+        // Создаем затемнение фона
+        var backgroundColor = new Color(0, 0, 0, 0.5f);
+        EditorGUI.DrawRect(new Rect(0, 0, position.width, position.height), backgroundColor);
+
+        // Окно редактирования
+        var windowRect = new Rect(position.width / 2 - 200, position.height / 2 - 150, 400, 300);
+        GUI.Window(0, windowRect, DrawNodeEditorWindowContent, "Редактирование узла");
+    }
+
+    private void DrawNodeEditorWindowContent(int id)
+    {
+        editingNodeScroll = GUILayout.BeginScrollView(editingNodeScroll);
+
+        // Поля для редактирования
+        GUILayout.Label("Текст:");
+        var line = GUILayout.TextArea(editingNode["line"]?.ToString() ?? "", GUILayout.Height(60));
+        editingNode["line"] = line;
+
+        GUILayout.Label("Тип:");
+        string[] types = { "M", "C", "P" };
+        var typeIndex = Array.IndexOf(types, editingNode["type"]?.ToString() ?? "M");
+        typeIndex = EditorGUILayout.Popup(typeIndex, types);
+        editingNode["type"] = types[typeIndex];
+
+        GUILayout.Label("Настроение:");
+        var mood = GUILayout.TextField(editingNode["mood"]?.ToString() ?? "");
+        editingNode["mood"] = mood;
+
+        GUILayout.Label("Достижение цели:");
+        var goalAchieve = editingNode["goal_achieve"]?.ToObject<int>() ?? 0;
+        goalAchieve = EditorGUILayout.IntSlider(goalAchieve, 0, 1);
+        editingNode["goal_achieve"] = goalAchieve;
+
+        GUILayout.EndScrollView();
+
+        GUILayout.BeginHorizontal();
+        if (GUILayout.Button("Сохранить"))
+        {
+            showNodeEditor = false;
+            Repaint();
+        }
+
+        if (GUILayout.Button("Отменить"))
+        {
+            showNodeEditor = false;
+            Repaint();
+        }
+
+        GUILayout.EndHorizontal();
+    }
+
+    private void CalculateGraphBounds()
+    {
+        if(selectedScript == null) return;
+        if (selectedScript["result"] == null || !selectedScript["result"].HasValues)
+        {
+            graphBounds = new Rect(0, 0, position.width, position.height);
+            return;
+        }
+
+        var nodes = (JArray)selectedScript["result"]["data"];
+        if (nodes == null || nodes.Count == 0)
+        {
+            graphBounds = new Rect(0, 0, position.width, position.height);
+            return;
+        }
+
+        var minX = float.MaxValue;
+        var minY = float.MaxValue;
+        var maxX = float.MinValue;
+        var maxY = float.MinValue;
+
+        foreach (JObject node in nodes)
+        {
+            var nodePos = GetNodePosition(node);
+            minX = Mathf.Min(minX, nodePos.x);
+            minY = Mathf.Min(minY, nodePos.y);
+            maxX = Mathf.Max(maxX, nodePos.x + 180 * graphZoom);
+            maxY = Mathf.Max(maxY, nodePos.y + 50 * graphZoom);
+        }
+
+        // Добавляем паддинг
+        graphBounds = new Rect(
+            minX - GRAPH_PADDING,
+            minY - GRAPH_PADDING,
+            maxX - minX + GRAPH_PADDING * 2,
+            maxY - minY + GRAPH_PADDING * 2
+        );
+    }
+
+    private void ShowNodeContextMenu(JObject node)
+    {
+        var menu = new GenericMenu();
+
+        menu.AddItem(new GUIContent("Удалить узел"), false, () =>
+        {
+            if (EditorUtility.DisplayDialog("Подтверждение", "Удалить этот узел?", "Да", "Нет"))
+            {
+                // Логика удаления узла
+            }
+        });
+
+        menu.AddItem(new GUIContent("Редактировать текст"), false, () =>
+        {
+            // Логика редактирования текста узла
+        });
+
+        menu.AddItem(new GUIContent("Добавить переход"), false, () =>
+        {
+            // Логика добавления перехода
+        });
+
+        menu.ShowAsContext();
+    }
+
+    private void DrawNodeCurve(Vector2 start, Vector2 end, Color color)
+    {
+        // Преобразуем координаты с учетом zoom и pan
+        var startPos = new Vector3(
+            start.x * graphZoom + graphPanOffset.x + graphRect.x,
+            start.y * graphZoom + graphPanOffset.y + graphRect.y,
+            0
+        );
+
+        var endPos = new Vector3(
+            end.x * graphZoom + graphPanOffset.x + graphRect.x,
+            end.y * graphZoom + graphPanOffset.y + graphRect.y,
+            0
+        );
+
+        var startTan = startPos + Vector3.right * 50;
+        var endTan = endPos + Vector3.left * 50;
+
+        Handles.DrawBezier(startPos, endPos, startTan, endTan, color, null, 3f);
+
+        // Рисуем стрелку
+        var arrowDir = (endPos - startPos).normalized;
+        var arrowHead = endPos - arrowDir * 10;
+
+        // Преобразуем все в Vector3 для совместимости
+        Handles.DrawAAConvexPolygon(
+            arrowHead,
+            arrowHead + Quaternion.Euler(0, 0, 30) * -arrowDir * 10,
+            arrowHead + Quaternion.Euler(0, 0, -30) * -arrowDir * 10
+        );
+    }
+
+    private Texture2D MakeTex(int width, int height, Color col)
+    {
+        var pix = new Color[width * height];
+        for (var i = 0; i < pix.Length; i++)
+            pix[i] = col;
+        var result = new Texture2D(width, height);
+        result.SetPixels(pix);
+        result.Apply();
+        return result;
+    }
+
     private void ClearEditScriptPageFields()
     {
         editScriptName = null;
@@ -1517,7 +2054,7 @@ public class PlotTalkAI : EditorWindow
         playerGetsItem = false;
         playerGetsInfoName = "";
         playerGetsItemName = "";
-        playerGetsInfoCondition = ""; 
+        playerGetsInfoCondition = "";
         playerGetsItemCondition = "";
         editScriptAdditional = null;
     }
@@ -1551,21 +2088,25 @@ public class PlotTalkAI : EditorWindow
     private float CalculateAvailableHeight()
     {
         // Базовые отступы
-        float basePadding = 40f;
+        var basePadding = 40f;
 
         // Высота заголовка и отступов
-        float headerHeight = 50f + 30f;
+        var headerHeight = 50f + 30f;
 
         // Высота кнопок (3 кнопки по 40 + отступы)
-        float buttonsHeight = 3 * 40f + 2 * 5f + 20f;
+        var buttonsHeight = 3 * 40f + 2 * 5f + 20f;
 
         return position.height - basePadding - headerHeight - buttonsHeight;
     }
 
     public void SwitchPage(Page page)
     {
+        graphZoom = 1.0f;
+        graphPanOffset = Vector2.zero;
+        isPanning = false;
+        selectedNode = null;
         scrollPosition = Vector2.zero;
-        bool loggedIn = StorageApi.GetInstance().IsLoggedIn();
+        var loggedIn = StorageApi.GetInstance().IsLoggedIn();
         if (page is Page.Register or Page.Login)
         {
             if (loggedIn)
