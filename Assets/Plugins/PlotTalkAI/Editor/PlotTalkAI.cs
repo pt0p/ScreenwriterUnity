@@ -141,6 +141,7 @@ public class PlotTalkAI : EditorWindow
     private GUIStyle textFieldStyle;
     private int toMainCharacterRelation;
     private int toNpcRelation;
+    private GUIStyle zoomLabelStyle;
 
     private void OnEnable()
     {
@@ -351,6 +352,13 @@ public class PlotTalkAI : EditorWindow
             normal = { textColor = textColor },
             hover = { textColor = new Color(0.75f, 0.75f, 0.75f) },
             fontSize = 14
+        };
+        
+        zoomLabelStyle = new GUIStyle(EditorStyles.label)
+        {
+            normal = { textColor = Color.gray },
+            fontSize = 10,
+            alignment = TextAnchor.LowerRight
         };
     }
 
@@ -1583,20 +1591,36 @@ public class PlotTalkAI : EditorWindow
 
         // Отображение графа
         GUI.BeginClip(graphRect);
-
-        // Рассчитываем границы графа
-        CalculateGraphBounds();
-
-        // Отрисовка содержимого графа
         DrawGraphContent();
-
         GUI.EndClip();
 
-        // Окно редактирования узла
-        if (showNodeEditor && editingNode != null) DrawNodeEditorWindow();
+        // Отрисовка надписи масштаба ПЕРЕД окном редактирования
+        // и в координатах всего окна редактора
+        Rect zoomLabelRect = new Rect(
+            position.width - 220,  // правый край окна с отступом
+            position.height - 40,  // нижний край окна с отступом
+            200,
+            20
+        );
+    
+        // Используем более контрастный стиль
+        var zoomStyle = new GUIStyle(EditorStyles.label)
+        {
+            normal = { textColor = Color.white },
+            fontSize = 12,
+            alignment = TextAnchor.LowerRight,
+            fontStyle = FontStyle.Bold
+        };
+    
+        // Добавляем фон для лучшей читаемости
+        EditorGUI.DrawRect(new Rect(zoomLabelRect.x - 5, zoomLabelRect.y, zoomLabelRect.width + 10, zoomLabelRect.height), 
+            new Color(0, 0, 0, 0.7f));
+    
+        GUI.Label(zoomLabelRect, $"Масштаб: {graphZoom * 100:0}%", zoomStyle);
 
-        // Отображение информации о масштабе
-        GUI.Label(new Rect(10, position.height - 40, 200, 20), $"Масштаб: {graphZoom * 100:0}%");
+        // Окно редактирования узла (рисуется поверх надписи)
+        if (showNodeEditor && editingNode != null) 
+            DrawNodeEditorWindow();
     }
 
     private void HandleGraphInput()
@@ -1694,95 +1718,237 @@ public class PlotTalkAI : EditorWindow
             e.Use();
         }
     }
-
     private void DrawGraphContent()
+{
+    if (selectedScript == null) return;
+
+    if (selectedScript["result"] == null || !selectedScript["result"].HasValues)
     {
-        if(selectedScript == null) return;
-        
-        if (selectedScript["result"] == null || !selectedScript["result"].HasValues)
+        var messagePos = new Vector2(graphRect.width / 2 - 100, graphRect.height / 2 - 10);
+        GUI.Label(new Rect(messagePos, new Vector2(200, 20)), "Диалог еще генерируется...",
+            centeredItalicLabelStyle);
+        return;
+    }
+
+    var nodes = (JArray)selectedScript["result"]["data"];
+    if (nodes == null) return;
+
+    // 1. Сначала рисуем связи (под узлами)
+    Handles.BeginGUI();
+    foreach (JObject node in nodes)
+    {
+        var fromId = (int)node["id"];
+        var fromPos = GetNodePosition(node);
+        var fromRect = new Rect(
+            fromPos.x * graphZoom + graphPanOffset.x,
+            fromPos.y * graphZoom + graphPanOffset.y,
+            180 * graphZoom,
+            50 * graphZoom
+        );
+
+        foreach (JObject link in node["to"])
         {
-            var messagePos = new Vector2(graphRect.width / 2 - 100, graphRect.height / 2 - 10);
-            GUI.Label(new Rect(messagePos, new Vector2(200, 20)), "Диалог еще генерируется...",
-                centeredItalicLabelStyle);
-            return;
-        }
-
-        var nodes = (JArray)selectedScript["result"]["data"];
-        if (nodes == null) return;
-
-        // Отрисовка связей
-        foreach (JObject node in nodes)
-        {
-            var fromId = (int)node["id"];
-            var fromPos = GetNodePosition(node);
-            var fromScreen = new Vector2(
-                fromPos.x * graphZoom + graphPanOffset.x + 90 * graphZoom,
-                fromPos.y * graphZoom + graphPanOffset.y + 25 * graphZoom
-            );
-
-            foreach (JObject link in node["to"])
+            var toId = (int)link["id"];
+            var toNode = nodes.FirstOrDefault(n => (int)n["id"] == toId) as JObject;
+            if (toNode != null)
             {
-                var toId = (int)link["id"];
-                var toNode = nodes.FirstOrDefault(n => (int)n["id"] == toId) as JObject;
-                if (toNode != null)
+                var toPos = GetNodePosition(toNode);
+                var toRect = new Rect(
+                    toPos.x * graphZoom + graphPanOffset.x,
+                    toPos.y * graphZoom + graphPanOffset.y,
+                    180 * graphZoom,
+                    50 * graphZoom
+                );
+
+                // Проверяем видимость линии
+                if (IsLineVisible(fromRect.center, toRect.center, new Rect(0, 0, graphRect.width, graphRect.height)))
                 {
-                    var toPos = GetNodePosition(toNode);
-                    var toScreen = new Vector2(
-                        toPos.x * graphZoom + graphPanOffset.x + 90 * graphZoom,
-                        toPos.y * graphZoom + graphPanOffset.y + 25 * graphZoom
-                    );
+                    // Вычисляем точки выхода и входа для кривой с перпендикулярными касательными
+                    Vector2 startPoint, endPoint;
+                    Vector2 startTangent, endTangent;
+                    CalculateCurveWithTangents(fromRect, toRect, out startPoint, out endPoint, out startTangent, out endTangent);
 
-                    Handles.BeginGUI();
-                    Handles.color = Color.blue;
-                    Handles.DrawAAPolyLine(3f, fromScreen, toScreen);
+                    // Рисуем кривую Безье с правильными касательными
+                    Handles.color = Color.white;
+                    Handles.DrawBezier(startPoint, endPoint, startTangent, endTangent, Color.white, null, 3f);
 
-                    // Рисуем стрелку
-                    var dir = (toScreen - fromScreen).normalized;
-                    Vector2 right = Quaternion.Euler(0, 0, 30) * dir * 10;
-                    Vector2 left = Quaternion.Euler(0, 0, -30) * dir * 10;
-                    Handles.DrawAAConvexPolygon(toScreen, toScreen - right, toScreen - left);
-                    Handles.EndGUI();
-                }
-            }
-        }
-
-        // Отрисовка узлов
-        foreach (JObject node in nodes)
-        {
-            var nodePos = GetNodePosition(node);
-            var nodeRect = new Rect(
-                nodePos.x * graphZoom + graphPanOffset.x,
-                nodePos.y * graphZoom + graphPanOffset.y,
-                180 * graphZoom,
-                50 * graphZoom
-            );
-
-            if (IsNodeVisible(nodeRect, new Rect(0, 0, graphRect.width, graphRect.height)))
-            {
-                var nodeStyle = new GUIStyle(EditorStyles.helpBox);
-                nodeStyle.wordWrap = true;
-                switch (node["type"].ToString())
-                {
-                    case "M": nodeStyle.normal.background = MakeTex(2, 2, new Color(0.8f, 0.8f, 1f)); break;
-                    case "C": nodeStyle.normal.background = MakeTex(2, 2, new Color(0.8f, 1f, 0.8f)); break;
-                    case "P": nodeStyle.normal.background = MakeTex(2, 2, new Color(1f, 0.8f, 0.8f)); break;
-                }
-
-                // Отрисовка узла
-                GUI.Box(nodeRect, node["line"].ToString(), nodeStyle);
-
-                // Обработка двойного клика для редактирования
-                if (Event.current.type == EventType.MouseDown &&
-                    Event.current.clickCount == 2 &&
-                    nodeRect.Contains(Event.current.mousePosition - graphRect.position))
-                {
-                    editingNode = node;
-                    showNodeEditor = true;
-                    Event.current.Use();
+                    // Рисуем стрелку, ориентированную по направлению кривой
+                    DrawArrowAlongCurve(endPoint, endTangent);
                 }
             }
         }
     }
+    Handles.EndGUI();
+
+    // 2. Затем рисуем узлы поверх связей
+    foreach (JObject node in nodes)
+    {
+        var nodePos = GetNodePosition(node);
+        var nodeRect = new Rect(
+            nodePos.x * graphZoom + graphPanOffset.x,
+            nodePos.y * graphZoom + graphPanOffset.y,
+            180 * graphZoom,
+            50 * graphZoom
+        );
+
+        if (IsNodeVisible(nodeRect, new Rect(0, 0, graphRect.width, graphRect.height)))
+        {
+            var nodeStyle = new GUIStyle(EditorStyles.helpBox);
+            nodeStyle.wordWrap = true;
+            nodeStyle.normal.textColor = Color.white;
+            nodeStyle.normal.background = MakeTex(2, 2, new Color(0.3f, 0.3f, 0.3f));
+
+            // Отрисовка узла
+            GUI.Box(nodeRect, node["line"].ToString(), nodeStyle);
+
+            // Обработка двойного клика для редактирования
+            if (Event.current.type == EventType.MouseDown &&
+                Event.current.clickCount == 2 &&
+                nodeRect.Contains(Event.current.mousePosition - graphRect.position))
+            {
+                editingNode = node;
+                showNodeEditor = true;
+                Event.current.Use();
+            }
+        }
+    }
+}
+
+// Вычисляет точки и касательные для кривой с перпендикулярными соединениями
+private void CalculateCurveWithTangents(Rect fromRect, Rect toRect, out Vector2 startPoint, out Vector2 endPoint, out Vector2 startTangent, out Vector2 endTangent)
+{
+    Vector2 fromCenter = fromRect.center;
+    Vector2 toCenter = toRect.center;
+
+    // Определяем направление от исходного узла к целевому
+    Vector2 direction = (toCenter - fromCenter).normalized;
+
+    // Вычисляем точки на границах прямоугольников
+    startPoint = GetBorderPoint(fromRect, direction);
+    endPoint = GetBorderPoint(toRect, -direction);
+
+    // Определяем нормали к границам в точках соединения (внешние)
+    Vector2 startNormal = GetOutwardBorderNormal(fromRect, startPoint);
+    Vector2 endNormal = GetOutwardBorderNormal(toRect, endPoint);
+
+    // Расстояние между точками соединения
+    float distance = Vector2.Distance(startPoint, endPoint);
+    
+    // Длина касательных (зависит от расстояния)
+    float tangentLength = Mathf.Min(distance * 0.3f, 100f);
+
+    // Касательные направлены вдоль нормалей (наружу)
+    startTangent = startPoint + startNormal * tangentLength;
+    endTangent = endPoint + endNormal * tangentLength;
+
+    // Для длинных связей добавляем изгиб
+    if (distance > 200f)
+    {
+        // Вычисляем среднюю точку и смещение для изгиба
+        Vector2 midPoint = (startPoint + endPoint) * 0.5f;
+        Vector2 perpendicular = new Vector2(-direction.y, direction.x);
+        
+        // Определяем направление изгиба
+        float bendDirection = (fromCenter.x < toCenter.x) ? 1f : -1f;
+        if (Mathf.Abs(direction.x) < 0.3f) // Если связь в основном вертикальная
+            bendDirection = (fromCenter.y < toCenter.y) ? -1f : 1f;
+            
+        Vector2 bendOffset = perpendicular * bendDirection * Mathf.Min(distance * 0.2f, 80f);
+        
+        // Смещаем касательные для создания изгиба
+        startTangent = startPoint + startNormal * tangentLength * 0.7f + bendOffset * 0.3f;
+        endTangent = endPoint + endNormal * tangentLength * 0.7f + bendOffset * 0.3f;
+    }
+}
+
+// Находит точку на границе прямоугольника в заданном направлении
+private Vector2 GetBorderPoint(Rect rect, Vector2 direction)
+{
+    Vector2 center = rect.center;
+    
+    // Нормализуем направление
+    direction = direction.normalized;
+
+    // Вычисляем пересечение луча из центра с границей прямоугольника
+    float tX = float.MaxValue;
+    float tY = float.MaxValue;
+
+    if (Mathf.Abs(direction.x) > 0.001f)
+    {
+        tX = direction.x > 0 ? 
+            (rect.xMax - center.x) / direction.x : 
+            (rect.xMin - center.x) / direction.x;
+    }
+
+    if (Mathf.Abs(direction.y) > 0.001f)
+    {
+        tY = direction.y > 0 ? 
+            (rect.yMax - center.y) / direction.y : 
+            (rect.yMin - center.y) / direction.y;
+    }
+
+    // Используем минимальное положительное t
+    float t = Mathf.Min(tX, tY);
+    
+    return center + direction * t;
+}
+
+// Определяет внешнюю нормаль к границе прямоугольника в заданной точке
+private Vector2 GetOutwardBorderNormal(Rect rect, Vector2 point)
+{
+    // Определяем, на какой стороне находится точка
+    float leftDist = Mathf.Abs(point.x - rect.xMin);
+    float rightDist = Mathf.Abs(point.x - rect.xMax);
+    float topDist = Mathf.Abs(point.y - rect.yMin);
+    float bottomDist = Mathf.Abs(point.y - rect.yMax);
+    
+    float minDist = Mathf.Min(leftDist, rightDist, topDist, bottomDist);
+    
+    // Возвращаем внешнюю нормаль к ближайшей стороне
+    if (minDist == leftDist)
+        return Vector2.left; // Внешняя нормаль к левой стороне (направлена влево)
+    else if (minDist == rightDist)
+        return Vector2.right; // Внешняя нормаль к правой стороне (направлена вправо)
+    else if (minDist == topDist)
+        return Vector2.down; // Внешняя нормаль к верхней стороне (направлена вверх)
+    else
+        return Vector2.up; // Внешняя нормаль к нижней стороне (направлена вниз)
+}
+
+// Рисует стрелку, ориентированную по направлению кривой
+private void DrawArrowAlongCurve(Vector2 arrowHead, Vector2 tangentPoint)
+{
+    // Вычисляем направление кривой в конечной точке
+    // Направление - от контрольной точки к конечной точке
+    Vector2 curveDirection = (arrowHead - tangentPoint).normalized;
+    
+    // Если направление нулевое, используем направление по умолчанию
+    if (curveDirection.sqrMagnitude < 0.001f)
+        curveDirection = Vector2.right;
+    
+    // Размер стрелки с учетом масштаба
+    float arrowLength = 7f * graphZoom;
+    float arrowWidth = 4f * graphZoom;
+    
+    // Смещаем стрелку немного назад по кривой, чтобы она не перекрывала точку соединения
+    Vector2 adjustedArrowHead = arrowHead;
+    
+    // Вершины стрелки
+    Vector2 arrowBase = adjustedArrowHead - curveDirection * arrowLength;
+    Vector2 arrowRight = arrowBase + new Vector2(-curveDirection.y, curveDirection.x) * arrowWidth;
+    Vector2 arrowLeft = arrowBase - new Vector2(-curveDirection.y, curveDirection.x) * arrowWidth;
+    
+    // Рисуем треугольник стрелки
+    Handles.color = Color.white;
+    Handles.DrawAAConvexPolygon(adjustedArrowHead, arrowRight, arrowLeft);
+}
+
+// Обновляем проверку видимости линии для работы с Vector2
+private bool IsLineVisible(Vector2 start, Vector2 end, Rect visibleArea)
+{
+    return visibleArea.Contains(start) || visibleArea.Contains(end) ||
+           LineIntersectsRect(start, end, visibleArea);
+}
 
     private Vector2 GetNodePosition(JObject node)
     {
@@ -1802,13 +1968,6 @@ public class PlotTalkAI : EditorWindow
     private bool IsNodeVisible(Rect nodeRect, Rect visibleArea)
     {
         return nodeRect.Overlaps(visibleArea);
-    }
-
-    private bool IsLineVisible(Vector2 start, Vector2 end, Rect visibleArea)
-    {
-        // Простая проверка: линия видна, если хотя бы одна точка находится в видимой области
-        return visibleArea.Contains(start) || visibleArea.Contains(end) ||
-               LineIntersectsRect(start, end, visibleArea);
     }
 
     private void ResetGraphView()
