@@ -453,6 +453,18 @@ namespace Plugins.PlotTalkAI.Utils
             JArray scenes = GetScenesArray(game);
             return scenes.FirstOrDefault(s => (long)s["id"] == sceneId) as JObject;
         }
+        
+        public JObject GetScriptById(string gameId, long sceneId, string scriptId)
+        {
+            JObject game = GetGameById(gameId);
+            if (game == null) return null;
+
+            JObject scene = GetSceneById(gameId, sceneId);
+            if (scene == null) return null;
+            
+            JArray scripts = GetScriptsArray(scene);
+            return scripts.FirstOrDefault(s => (string)s["id"] == scriptId) as JObject;
+        }
 
         public JArray GetScriptsArray(JObject scene)
         {
