@@ -37,6 +37,10 @@ public class PlotTalkAI : EditorWindow
     private GUIStyle centeredLabelStyle;
     private GUIStyle centeredSmallLabelStyle;
 
+    private JObject editingLink;
+    private JObject editingLinkSourceNode;
+    private bool showLinkEditor;
+    private Vector2 linkEditorScroll;
     private Page currentPage = Page.Login;
     private Vector2 dragOffset;
     private string editCharacterExtra;
@@ -72,6 +76,12 @@ public class PlotTalkAI : EditorWindow
 
     private int editScriptMinMainChar;
 
+    private Vector2 lineEditInfoScroll;
+
+    private Stack<JObject> undoStack = new Stack<JObject>();
+    private Stack<JObject> redoStack = new Stack<JObject>();
+    private bool isTakingSnapshot = false;
+
     // edit script
     private string editScriptName;
     private GUIStyle fieldLabelStyle;
@@ -94,6 +104,7 @@ public class PlotTalkAI : EditorWindow
 
     private bool isHoveringLink;
     private bool isPanning;
+    private bool windowInitialized;
     private Vector2 lastMousePosition;
 
     // cashed styles
@@ -129,6 +140,9 @@ public class PlotTalkAI : EditorWindow
     private Vector2 scrollPosition;
     private JObject selectedCharacter;
 
+    private string lineEditText;
+    private string lineEditInfo;
+
     // selected objects
     private JObject selectedGame;
     private string selectedMainCharacterId;
@@ -143,6 +157,8 @@ public class PlotTalkAI : EditorWindow
     private int toMainCharacterRelation;
     private int toNpcRelation;
     private GUIStyle zoomLabelStyle;
+    string nodeEditText;
+    private int nodeEditItem = -1;
 
     private void OnEnable()
     {
@@ -1547,6 +1563,283 @@ public class PlotTalkAI : EditorWindow
         // Окно редактирования узла (рисуется поверх всего)
         if (showNodeEditor && editingNode != null)
             DrawNodeEditorWindow();
+
+        // Окно редактирования связи (рисуется поверх всего)
+        if (showLinkEditor && editingLink != null)
+            DrawLinkEditorWindow();
+    }
+
+    // Метод для создания снимка состояния
+    private void TakeSnapshot()
+    {
+        if (isTakingSnapshot || selectedScript == null) return;
+
+        isTakingSnapshot = true;
+
+        // Создаем глубокую копию текущего состояния
+        var snapshot = DeepCopy(selectedScript["result"] as JObject);
+        undoStack.Push(snapshot);
+
+        // Очищаем стек redo при новом действии
+        redoStack.Clear();
+
+        isTakingSnapshot = false;
+    }
+
+// Метод для глубокого копирования JObject
+    private JObject DeepCopy(JObject original)
+    {
+        if (original == null) return null;
+        return JObject.Parse(original.ToString());
+    }
+
+// Метод отмены
+    private void Undo()
+    {
+        if (undoStack.Count == 0) return;
+
+        // Сохраняем текущее состояние в redo stack
+        if (selectedScript != null && selectedScript["result"] != null)
+        {
+            redoStack.Push(DeepCopy(selectedScript["result"] as JObject));
+        }
+
+        // Восстанавливаем предыдущее состояние
+        var previousState = undoStack.Pop();
+        if (selectedScript != null)
+        {
+            selectedScript["result"] = previousState;
+            Repaint();
+        }
+    }
+
+// Метод возврата
+    private void Redo()
+    {
+        if (redoStack.Count == 0) return;
+
+        // Сохраняем текущее состояние в undo stack
+        if (selectedScript != null && selectedScript["result"] != null)
+        {
+            undoStack.Push(DeepCopy(selectedScript["result"] as JObject));
+        }
+
+        // Восстанавливаем отмененное состояние
+        var nextState = redoStack.Pop();
+        if (selectedScript != null)
+        {
+            selectedScript["result"] = nextState;
+            Repaint();
+        }
+    }
+
+    private void DrawNodeEditorWindow()
+    {
+        if (editingNode == null) return;
+
+        if (!windowInitialized)
+        {
+            nodeEditText = editingNode["line"]?.ToString() ?? "";
+            nodeEditItem = (int)(editingNode["goal_achieved"]?["info"] ?? -1);
+            windowInitialized = true;
+        }
+
+        // Создаем затемнение фона
+        var backgroundColor = new Color(0, 0, 0, 0.5f);
+        EditorGUI.DrawRect(new Rect(0, 0, position.width, position.height), backgroundColor);
+
+        // Окно редактирования узла
+        var windowRect = new Rect(position.width / 2 - 190, position.height / 2 - 190, 380, 380);
+
+        // Рисуем фон окна
+        var windowBackground =
+            EditorGUIUtility.isProSkin ? new Color(0.22f, 0.22f, 0.22f) : new Color(0.9f, 0.9f, 0.9f);
+        EditorGUI.DrawRect(windowRect, windowBackground);
+
+        GUILayout.BeginArea(windowRect);
+        GUILayout.BeginHorizontal();
+        GUILayout.Space(10);
+        GUILayout.BeginVertical();
+
+        var headerStyle = new GUIStyle(EditorStyles.boldLabel)
+        {
+            fontSize = 16,
+            alignment = TextAnchor.MiddleCenter,
+            normal = { textColor = EditorGUIUtility.isProSkin ? Color.white : Color.black }
+        };
+
+        GUILayout.Space(10);
+
+        GUILayout.Label("Редактирование реплики NPC", headerStyle);
+        GUILayout.Space(10);
+
+        var labelStyle = new GUIStyle(EditorStyles.label)
+        {
+            normal = { textColor = EditorGUIUtility.isProSkin ? Color.white : Color.black }
+        };
+
+        GUILayout.Label("Текст реплики:", labelStyle);
+        GUILayout.Space(5);
+
+        // TextArea с запретом горизонтальной прокрутки
+        var textAreaStyle = new GUIStyle(EditorStyles.textArea)
+        {
+            wordWrap = true // Запрещаем горизонтальную прокрутку, включая перенос слов
+        };
+
+        editingNodeScroll = GUILayout.BeginScrollView(editingNodeScroll, GUIStyle.none, GUI.skin.verticalScrollbar,
+            GUILayout.Height(100));
+        nodeEditText = EditorGUILayout.TextArea(nodeEditText, textAreaStyle, GUILayout.ExpandHeight(true));
+        GUILayout.EndScrollView();
+
+        GUILayout.Space(10);
+        GUILayout.Label("ID получаемого предмета:", labelStyle);
+        nodeEditItem = EditorGUILayout.IntField(nodeEditItem);
+
+        GUILayout.Space(10);
+
+        GUILayout.BeginHorizontal();
+        if (GUILayout.Button("Сохранить"))
+        {
+            TakeSnapshot();
+            editingNode["line"] = nodeEditText;
+            editingNode["goal_achieved"]["info"] = nodeEditItem;
+            showNodeEditor = false;
+            windowInitialized = false;
+            Repaint();
+        }
+
+        if (GUILayout.Button("Отменить"))
+        {
+            showNodeEditor = false;
+            windowInitialized = false;
+            Repaint();
+        }
+
+        GUILayout.EndHorizontal();
+        GUILayout.Space(10);
+        GUILayout.EndVertical();
+        GUILayout.Space(10);
+        GUILayout.EndHorizontal();
+
+        GUILayout.EndArea();
+
+        // Обработка закрытия окна по клику вне области
+        if (Event.current.type == EventType.MouseDown && !windowRect.Contains(Event.current.mousePosition))
+        {
+            showNodeEditor = false;
+            windowInitialized = false;
+            Event.current.Use();
+            Repaint();
+        }
+    }
+
+    private void DrawLinkEditorWindow()
+    {
+        if (editingLink == null) return;
+
+        if (!windowInitialized)
+        {
+            lineEditText = editingLink["line"]?.ToString() ?? "";
+            lineEditInfo = editingLink["info"]?.ToString() ?? "";
+            windowInitialized = true;
+        }
+
+        // Создаем затемнение фона
+        var backgroundColor = new Color(0, 0, 0, 0.5f);
+        EditorGUI.DrawRect(new Rect(0, 0, position.width, position.height), backgroundColor);
+
+        // Окно редактирования связи - увеличиваем высоту для лучшего отображения
+        var windowRect = new Rect(position.width / 2 - 190, position.height / 2 - 220, 380, 440);
+
+        // Рисуем фон окна
+        var windowBackground =
+            EditorGUIUtility.isProSkin ? new Color(0.22f, 0.22f, 0.22f) : new Color(0.9f, 0.9f, 0.9f);
+        EditorGUI.DrawRect(windowRect, windowBackground);
+
+        GUILayout.BeginArea(windowRect);
+        GUILayout.BeginHorizontal();
+        GUILayout.Space(10);
+        GUILayout.BeginVertical();
+
+        var headerStyle = new GUIStyle(EditorStyles.boldLabel)
+        {
+            fontSize = 16,
+            alignment = TextAnchor.MiddleCenter,
+            normal = { textColor = EditorGUIUtility.isProSkin ? Color.white : Color.black }
+        };
+
+        GUILayout.Space(10);
+
+        GUILayout.Label("Редактирование реплики\nглавного персонажа", headerStyle);
+        GUILayout.Space(10);
+
+        var labelStyle = new GUIStyle(EditorStyles.label)
+        {
+            normal = { textColor = EditorGUIUtility.isProSkin ? Color.white : Color.black }
+        };
+
+        // Стиль для TextArea с запретом горизонтальной прокрутки
+        var textAreaStyle = new GUIStyle(EditorStyles.textArea)
+        {
+            wordWrap = true // Запрещаем горизонтальную прокрутку, включая перенос слов
+        };
+
+        GUILayout.Label("Текст реплики:", labelStyle);
+        GUILayout.Space(5);
+
+        // TextArea с запретом горизонтальной прокрутки
+        linkEditorScroll = GUILayout.BeginScrollView(linkEditorScroll, GUIStyle.none, GUI.skin.verticalScrollbar,
+            GUILayout.Height(80));
+        lineEditText = EditorGUILayout.TextArea(lineEditText, textAreaStyle, GUILayout.ExpandHeight(true));
+        GUILayout.EndScrollView();
+
+        GUILayout.Space(10);
+        GUILayout.Label("Сокращенный текст (отображается на кнопках):", labelStyle);
+        GUILayout.Space(5);
+
+        // Второй TextArea с запретом горизонтальной прокрутки
+        lineEditInfoScroll = GUILayout.BeginScrollView(lineEditInfoScroll, GUIStyle.none, GUI.skin.verticalScrollbar,
+            GUILayout.Height(80));
+        lineEditInfo = EditorGUILayout.TextArea(lineEditInfo, textAreaStyle, GUILayout.ExpandHeight(true));
+        GUILayout.EndScrollView();
+
+        GUILayout.Space(15);
+
+        GUILayout.BeginHorizontal();
+        if (GUILayout.Button("Сохранить"))
+        {
+            TakeSnapshot();
+            editingLink["line"] = lineEditText;
+            editingLink["info"] = lineEditInfo;
+            showLinkEditor = false;
+            windowInitialized = false;
+            Repaint();
+        }
+
+        if (GUILayout.Button("Отменить"))
+        {
+            showLinkEditor = false;
+            windowInitialized = false;
+            Repaint();
+        }
+
+        GUILayout.EndHorizontal();
+        GUILayout.Space(10);
+        GUILayout.EndVertical();
+        GUILayout.Space(10);
+        GUILayout.EndHorizontal();
+
+        GUILayout.EndArea();
+
+        // Обработка закрытия окна по клику вне области
+        if (Event.current.type == EventType.MouseDown && !windowRect.Contains(Event.current.mousePosition))
+        {
+            showLinkEditor = false;
+            windowInitialized = false;
+            Event.current.Use();
+            Repaint();
+        }
     }
 
     private void DrawGraphControlPanel()
@@ -1579,16 +1872,22 @@ public class PlotTalkAI : EditorWindow
 
             GUILayout.BeginHorizontal();
 
-            // Кнопки навигации
+            // Кнопки undo/redo
+            EditorGUI.BeginDisabledGroup(undoStack.Count == 0);
             if (GUILayout.Button(EditorGUIUtility.IconContent("d_back"), iconButtonStyle))
             {
-                // Логика для кнопки "Назад"
+                Undo();
             }
 
+            EditorGUI.EndDisabledGroup();
+
+            EditorGUI.BeginDisabledGroup(redoStack.Count == 0);
             if (GUILayout.Button(EditorGUIUtility.IconContent("d_forward"), iconButtonStyle))
             {
-                // Логика для кнопки "Вперед"
+                Redo();
             }
+
+            EditorGUI.EndDisabledGroup();
 
             GUILayout.FlexibleSpace();
 
@@ -1614,6 +1913,9 @@ public class PlotTalkAI : EditorWindow
                     selectedScript = StorageApi.GetInstance().GetScriptById((string)selectedGame["id"],
                         (long)selectedScene["id"], (string)selectedScript["id"]);
                     ResetGraphView();
+                    // Очищаем стеки при перезагрузке
+                    undoStack.Clear();
+                    redoStack.Clear();
                 }
             }
 
@@ -1628,6 +1930,8 @@ public class PlotTalkAI : EditorWindow
 
     private void HandleGraphInput()
     {
+        if (showNodeEditor || showLinkEditor)
+            return;
         var e = Event.current;
         var mousePos = e.mousePosition;
 
@@ -1692,6 +1996,7 @@ public class PlotTalkAI : EditorWindow
             }
             else // Одинарный клик - начало перетаскивания
             {
+                TakeSnapshot();
                 HandleNodeSelection(graphMousePos);
                 e.Use();
             }
@@ -1761,6 +2066,7 @@ public class PlotTalkAI : EditorWindow
             // Проверяем попадание мыши в узел в координатах графа
             if (nodeRect.Contains(graphMousePos))
             {
+                windowInitialized = false;
                 editingNode = node;
                 showNodeEditor = true;
                 editingNodeScroll = Vector2.zero;
@@ -1873,6 +2179,9 @@ public class PlotTalkAI : EditorWindow
 
                         // Рисуем стрелку, ориентированную по направлению кривой
                         DrawArrowAlongCurve(endPoint, endTangent);
+
+                        // Рисуем текст реплики на связи
+                        DrawLinkText(link, startPoint, endPoint, startTangent, endTangent);
                     }
                 }
             }
@@ -1915,6 +2224,96 @@ public class PlotTalkAI : EditorWindow
                 GUI.Box(nodeRect, nodeText, nodeStyle);
             }
         }
+    }
+
+    private void DrawLinkText(JObject link, Vector2 startPoint, Vector2 endPoint, Vector2 startTangent,
+        Vector2 endTangent)
+    {
+        // Получаем текст реплики (если есть)
+        var linkText = link["line"]?.ToString();
+        if (string.IsNullOrEmpty(linkText)) return;
+
+        // Вычисляем точку на середине кривой Безье
+        var midPoint = CalculateBezierPoint(0.5f, startPoint, startTangent, endTangent, endPoint);
+
+        // Создаем стиль для текста связи
+        var linkTextStyle = new GUIStyle(EditorStyles.label);
+        linkTextStyle.normal.textColor = Color.white;
+        linkTextStyle.fontSize = Mathf.RoundToInt(10 * graphZoom);
+        linkTextStyle.alignment = TextAnchor.MiddleCenter;
+        linkTextStyle.wordWrap = true;
+
+        // Вычисляем размер текста
+        var content = new GUIContent(TruncateText(linkText, 5));
+        var textSize = linkTextStyle.CalcSize(content);
+
+        // Создаем Rect для текста
+        var textRect = new Rect(
+            midPoint.x - textSize.x / 2,
+            midPoint.y - textSize.y / 2,
+            textSize.x,
+            textSize.y
+        );
+
+        // Рисуем фон для текста для лучшей читаемости
+        var backgroundColor =
+            EditorGUIUtility.isProSkin ? new Color(0.1f, 0.1f, 0.1f, 0.8f) : new Color(1f, 1f, 1f, 0.8f);
+
+        EditorGUI.DrawRect(new Rect(
+            textRect.x - 2, textRect.y - 1,
+            textRect.width + 4, textRect.height + 2
+        ), backgroundColor);
+
+        // Рисуем текст
+        GUI.Label(textRect, content, linkTextStyle);
+        if (showNodeEditor || showLinkEditor)
+            return;
+        // Обработка клика по тексту
+        if (Event.current.type == EventType.Used && Event.current.button == 0 && Event.current.clickCount == 1)
+        {
+            if (textRect.Contains(Event.current.mousePosition))
+            {
+                windowInitialized = false;
+                editingLink = link;
+                showLinkEditor = true;
+                linkEditorScroll = Vector2.zero;
+                Event.current.Use();
+            }
+        }
+
+        // Изменяем курсор при наведении
+        if (textRect.Contains(Event.current.mousePosition))
+        {
+            EditorGUIUtility.AddCursorRect(textRect, MouseCursor.Link);
+            isHoveringLink = true;
+        }
+    }
+
+    // Вычисляет точку на кривой Безье для параметра t (0-1)
+    private Vector2 CalculateBezierPoint(float t, Vector2 p0, Vector2 p1, Vector2 p2, Vector2 p3)
+    {
+        float u = 1 - t;
+        float tt = t * t;
+        float uu = u * u;
+        float uuu = uu * u;
+        float ttt = tt * t;
+
+        Vector2 p = uuu * p0;
+        p += 3 * uu * t * p1;
+        p += 3 * u * tt * p2;
+        p += ttt * p3;
+
+        return p;
+    }
+
+// Находит узел по ID
+    private JObject FindNodeById(int id)
+    {
+        if (selectedScript == null || selectedScript["result"] == null)
+            return null;
+
+        var nodes = (JArray)selectedScript["result"]["data"];
+        return nodes?.FirstOrDefault(n => (int)n["id"] == id) as JObject;
     }
 
     private string TruncateText(string text, int maxWords = 10)
@@ -2132,61 +2531,6 @@ public class PlotTalkAI : EditorWindow
         node["meta"]["y"] = position.y;
     }
 
-    private void DrawNodeEditorWindow()
-    {
-        if (editingNode == null) return;
-
-        // Создаем затемнение фона
-        var backgroundColor = new Color(0, 0, 0, 0.5f);
-        EditorGUI.DrawRect(new Rect(0, 0, position.width, position.height), backgroundColor);
-
-        // Окно редактирования
-        var windowRect = new Rect(position.width / 2 - 200, position.height / 2 - 150, 400, 300);
-        GUI.Window(0, windowRect, DrawNodeEditorWindowContent, "Редактирование узла");
-    }
-
-    private void DrawNodeEditorWindowContent(int id)
-    {
-        editingNodeScroll = GUILayout.BeginScrollView(editingNodeScroll);
-
-        // Поля для редактирования
-        GUILayout.Label("Текст:");
-        var line = GUILayout.TextArea(editingNode["line"]?.ToString() ?? "", GUILayout.Height(60));
-        editingNode["line"] = line;
-
-        GUILayout.Label("Тип:");
-        string[] types = { "M", "C", "P" };
-        var typeIndex = Array.IndexOf(types, editingNode["type"]?.ToString() ?? "M");
-        typeIndex = EditorGUILayout.Popup(typeIndex, types);
-        editingNode["type"] = types[typeIndex];
-
-        GUILayout.Label("Настроение:");
-        var mood = GUILayout.TextField(editingNode["mood"]?.ToString() ?? "");
-        editingNode["mood"] = mood;
-
-        GUILayout.Label("Достижение цели:");
-        var goalAchieve = editingNode["goal_achieve"]?.ToObject<int>() ?? 0;
-        goalAchieve = EditorGUILayout.IntSlider(goalAchieve, 0, 1);
-        editingNode["goal_achieve"] = goalAchieve;
-
-        GUILayout.EndScrollView();
-
-        GUILayout.BeginHorizontal();
-        if (GUILayout.Button("Сохранить"))
-        {
-            showNodeEditor = false;
-            Repaint();
-        }
-
-        if (GUILayout.Button("Отменить"))
-        {
-            showNodeEditor = false;
-            Repaint();
-        }
-
-        GUILayout.EndHorizontal();
-    }
-
     private void CalculateGraphBounds()
     {
         if (selectedScript == null) return;
@@ -2376,6 +2720,12 @@ public class PlotTalkAI : EditorWindow
                 currentPage = Page.Login;
                 return;
             }
+        }
+
+        if (page != Page.GraphEditor)
+        {
+            undoStack.Clear();
+            redoStack.Clear();
         }
 
         pageInitialized = false;
