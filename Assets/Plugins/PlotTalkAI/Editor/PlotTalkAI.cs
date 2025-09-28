@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using System.Collections.Generic;
 using System.Linq;
 using Newtonsoft.Json.Linq;
@@ -1037,7 +1038,7 @@ public class PlotTalkAI : EditorWindow
 
                 if (GUILayout.Button(EditorGUIUtility.IconContent("Download-Available"), iconButtonStyle))
                 {
-                    // Логика сохранения сцены
+                    ExportSceneDialogs((JObject)scene);
                 }
 
                 GUILayout.Space(5);
@@ -1084,6 +1085,11 @@ public class PlotTalkAI : EditorWindow
                                     .DeleteScript((string)selectedGame["id"], sceneId, (string)script["id"]);
                                 selectedGame = StorageApi.GetInstance().GetGameById((string)selectedGame["id"]);
                             }
+                        
+                        if (GUILayout.Button(EditorGUIUtility.IconContent("Download-Available"), iconButtonStyle))
+                        {
+                            ExportDialogue((JObject)script);
+                        }
 
                         GUILayout.Space(3.5f);
 
@@ -1102,6 +1108,158 @@ public class PlotTalkAI : EditorWindow
         GUILayout.Space(50);
         GUILayout.EndArea();
     }
+    
+    /// <summary>
+/// Экспортирует диалог в JSON файл
+/// </summary>
+private void ExportDialogue(JObject script)
+{
+    try
+    {
+        // Получаем имена персонажей
+        var npcName = GetCharacterNameById((string)script["npc"]);
+        var heroName = GetCharacterNameById((string)script["main_character"]);
+        
+        // Создаем структуру для экспорта
+        var exportData = new JArray();
+        
+        if (script["result"] != null && script["result"].HasValues)
+        {
+            var dialogueExport = new JObject
+            {
+                ["id"] = script["id"],
+                ["npc_name"] = npcName,
+                ["hero_name"] = heroName,
+                ["data"] = script["result"]
+            };
+            exportData.Add(dialogueExport);
+        }
+        
+        // Предлагаем выбрать место сохранения
+        var defaultFileName = $"{script["id"]?.ToString() ?? "dialogue"}.json";
+        var defaultFolder = Path.Combine(Application.dataPath, "Resources", "dialogues");
+        
+        // Создаем папку по умолчанию, если не существует
+        if (!Directory.Exists(defaultFolder))
+        {
+            Directory.CreateDirectory(defaultFolder);
+        }
+        
+        var path = EditorUtility.SaveFilePanel(
+            "Экспортировать диалог",
+            defaultFolder,
+            defaultFileName,
+            "json"
+        );
+        
+        if (!string.IsNullOrEmpty(path))
+        {
+            File.WriteAllText(path, exportData.ToString(Newtonsoft.Json.Formatting.Indented));
+            EditorUtility.DisplayDialog("Успех", "Диалог успешно экспортирован", "OK");
+            
+            // Если файл сохранен в папке Assets, обновляем проект
+            if (path.StartsWith(Application.dataPath))
+            {
+                AssetDatabase.Refresh();
+            }
+        }
+    }
+    catch (System.Exception e)
+    {
+        EditorUtility.DisplayDialog("Ошибка", $"Не удалось экспортировать диалог: {e.Message}", "OK");
+    }
+}
+
+/// <summary>
+/// Экспортирует все диалоги сцены в JSON файл
+/// </summary>
+private void ExportSceneDialogs(JObject scene)
+{
+    try
+    {
+        var sceneDialogs = new JArray();
+        var scripts = scene["scripts"] as JArray;
+        
+        if (scripts == null || scripts.Count == 0)
+        {
+            EditorUtility.DisplayDialog("Информация", "В сцене нет диалогов для экспорта", "OK");
+            return;
+        }
+        
+        foreach (var script in scripts)
+        {
+            var scriptObj = (JObject)script;
+            var npcName = GetCharacterNameById((string)scriptObj["npc"]);
+            var heroName = GetCharacterNameById((string)scriptObj["main_character"]);
+            
+            if (scriptObj["result"] != null && scriptObj["result"].HasValues)
+            {
+                var dialogueExport = new JObject
+                {
+                    ["id"] = script["id"],
+                    ["npc_name"] = npcName,
+                    ["hero_name"] = heroName,
+                    ["data"] = scriptObj["result"]
+                };
+                sceneDialogs.Add(dialogueExport);
+            }
+        }
+        
+        if (sceneDialogs.Count == 0)
+        {
+            EditorUtility.DisplayDialog("Информация", "В сцене нет сгенерированных диалогов", "OK");
+            return;
+        }
+        
+        // Предлагаем выбрать место сохранения
+        var defaultFileName = $"{scene["id"]?.ToString() ?? "scene"}.json";
+        var defaultFolder = Path.Combine(Application.dataPath, "Resources", "dialogues");
+        
+        // Создаем папку по умолчанию, если не существует
+        if (!Directory.Exists(defaultFolder))
+        {
+            Directory.CreateDirectory(defaultFolder);
+        }
+        
+        var path = EditorUtility.SaveFilePanel(
+            "Экспортировать диалоги сцены",
+            defaultFolder,
+            defaultFileName,
+            "json"
+        );
+        
+        if (!string.IsNullOrEmpty(path))
+        {
+            File.WriteAllText(path, sceneDialogs.ToString(Newtonsoft.Json.Formatting.Indented));
+            EditorUtility.DisplayDialog("Успех", $"Экспортировано {sceneDialogs.Count} диалогов", "OK");
+            
+            // Если файл сохранен в папке Assets, обновляем проект
+            if (path.StartsWith(Application.dataPath))
+            {
+                AssetDatabase.Refresh();
+            }
+        }
+    }
+    catch (System.Exception e)
+    {
+        EditorUtility.DisplayDialog("Ошибка", $"Не удалось экспортировать диалоги: {e.Message}", "OK");
+    }
+}
+
+/// <summary>
+/// Получает имя персонажа по ID
+/// </summary>
+private string GetCharacterNameById(string characterId)
+{
+    if (selectedGame == null || string.IsNullOrEmpty(characterId))
+        return "Неизвестный персонаж";
+    
+    var characters = selectedGame["characters"] as JArray;
+    if (characters == null) return "Неизвестный персонаж";
+    
+    var character = characters.FirstOrDefault(c => (string)c["id"] == characterId);
+    return character?["name"]?.ToString() ?? "Неизвестный персонаж";
+}
 
     private void DrawEditScenePage()
     {
@@ -1933,7 +2091,7 @@ public class PlotTalkAI : EditorWindow
             GUILayout.FlexibleSpace();
 
             // Новая кнопка авто-расположения
-            if (GUILayout.Button("AUTO", lowButtonStyle, GUILayout.Height(30)))
+            if (GUILayout.Button("Авторасстановка", lowButtonStyle, GUILayout.Height(30)))
             {
                 TakeSnapshot();
                 AutoLayoutDAG();
