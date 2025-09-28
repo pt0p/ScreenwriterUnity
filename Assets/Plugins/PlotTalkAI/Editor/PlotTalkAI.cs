@@ -1536,6 +1536,23 @@ public class PlotTalkAI : EditorWindow
 
     private void DrawGraphEditorPage()
     {
+        if (!pageInitialized)
+        {
+            // Проверяем, есть ли уже расположенные узлы
+            bool needsLayout = selectedScript != null && 
+                               selectedScript["result"] != null &&
+                               selectedScript["result"]["data"] != null &&
+                               ((JArray)selectedScript["result"]["data"]).Count > 0 &&
+                               !HasNodePositions((JArray)selectedScript["result"]["data"]);
+        
+            if (needsLayout)
+            {
+                AutoLayoutDAG();
+            }
+        
+            pageInitialized = true;
+        }
+        
         // Сначала обрабатываем ввод
         HandleGraphInput();
 
@@ -1567,6 +1584,16 @@ public class PlotTalkAI : EditorWindow
         // Окно редактирования связи (рисуется поверх всего)
         if (showLinkEditor && editingLink != null)
             DrawLinkEditorWindow();
+    }
+    
+    private bool HasNodePositions(JArray nodes)
+    {
+        foreach (JObject node in nodes)
+        {
+            if (node["meta"]?["x"] == null || node["meta"]?["y"] == null)
+                return false;
+        }
+        return true;
     }
 
     // Метод для создания снимка состояния
@@ -1901,6 +1928,15 @@ public class PlotTalkAI : EditorWindow
                     selectedScript
                 );
                 EditorUtility.DisplayDialog("Успех", "Изменения сохранены", "OK");
+            }
+            
+            GUILayout.FlexibleSpace();
+
+            // Новая кнопка авто-расположения
+            if (GUILayout.Button("AUTO", lowButtonStyle, GUILayout.Height(30)))
+            {
+                TakeSnapshot();
+                AutoLayoutDAG();
             }
 
             GUILayout.FlexibleSpace();
@@ -2488,6 +2524,135 @@ public class PlotTalkAI : EditorWindow
 
         Repaint();
     }
+    
+    private void AutoLayoutDAG()
+{
+    if (selectedScript == null || selectedScript["result"] == null) return;
+    
+    var nodes = (JArray)selectedScript["result"]["data"];
+    if (nodes == null || nodes.Count == 0) return;
+
+    // Вычисляем уровни для каждого узла
+    var levels = CalculateNodeLevels(nodes);
+    
+    // Распределяем узлы по уровням
+    var levelNodes = new Dictionary<int, List<JObject>>();
+    foreach (var kvp in levels)
+    {
+        var level = kvp.Value;
+        if (!levelNodes.ContainsKey(level))
+            levelNodes[level] = new List<JObject>();
+        
+        levelNodes[level].Add(FindNodeById(nodes, kvp.Key));
+    }
+    
+    // Располагаем узлы по уровням
+    float startX = 100f;
+    float startY = 100f;
+    float levelHeight = 120f;
+    float nodeWidth = 180f;
+    
+    foreach (var level in levelNodes.Keys.OrderBy(l => l))
+    {
+        var nodesInLevel = levelNodes[level];
+        float levelWidth = nodesInLevel.Count * (nodeWidth + 20f);
+        float currentX = startX + (position.width - levelWidth) / 2; // центрируем уровень
+        
+        for (int i = 0; i < nodesInLevel.Count; i++)
+        {
+            var node = nodesInLevel[i];
+            if (node["meta"] == null)
+                node["meta"] = new JObject();
+                
+            node["meta"]["x"] = currentX + i * (nodeWidth + 20f);
+            node["meta"]["y"] = startY + level * levelHeight;
+        }
+    }
+    
+    Repaint();
+}
+
+private Dictionary<int, int> CalculateNodeLevels(JArray nodes)
+{
+    var levels = new Dictionary<int, int>();
+    var visited = new HashSet<int>();
+    
+    // Находим корневые узлы (без входящих связей)
+    var rootNodes = FindRootNodes(nodes);
+    
+    // BFS для определения уровней
+    var queue = new Queue<JObject>();
+    foreach (var root in rootNodes)
+    {
+        levels[(int)root["id"]] = 0;
+        queue.Enqueue(root);
+        visited.Add((int)root["id"]);
+    }
+    
+    while (queue.Count > 0)
+    {
+        var current = queue.Dequeue();
+        var currentLevel = levels[(int)current["id"]];
+        
+        foreach (JObject link in current["to"])
+        {
+            var childId = (int)link["id"];
+            var childNode = FindNodeById(nodes, childId);
+            
+            if (childNode != null)
+            {
+                // Уровень ребенка = максимальный(текущий уровень, уровень родителя + 1)
+                var newLevel = Mathf.Max(
+                    levels.ContainsKey(childId) ? levels[childId] : 0,
+                    currentLevel + 1
+                );
+                
+                levels[childId] = newLevel;
+                
+                if (!visited.Contains(childId))
+                {
+                    visited.Add(childId);
+                    queue.Enqueue(childNode);
+                }
+            }
+        }
+    }
+    
+    return levels;
+}
+
+private List<JObject> FindRootNodes(JArray nodes)
+{
+    var nodesWithIncoming = new HashSet<int>();
+    
+    // Находим все узлы, у которых есть входящие связи
+    foreach (JObject node in nodes)
+    {
+        foreach (JObject link in node["to"])
+        {
+            nodesWithIncoming.Add((int)link["id"]);
+        }
+    }
+    
+    // Корневые узлы - те, у которых нет входящих связей
+    var roots = new List<JObject>();
+    foreach (JObject node in nodes)
+    {
+        if (!nodesWithIncoming.Contains((int)node["id"]))
+            roots.Add(node);
+    }
+    
+    // Если все узлы имеют входящие связи, берем узел с минимальным id
+    if (roots.Count == 0 && nodes.Count > 0)
+        roots.Add((JObject)nodes[0]);
+    
+    return roots;
+}
+
+private JObject FindNodeById(JArray nodes, int id)
+{
+    return nodes.FirstOrDefault(n => (int)n["id"] == id) as JObject;
+}
 
     private bool LineIntersectsRect(Vector2 start, Vector2 end, Rect rect)
     {
@@ -2520,15 +2685,6 @@ public class PlotTalkAI : EditorWindow
             return false;
 
         return true;
-    }
-
-    private void SetNodePosition(JObject node, Vector2 position)
-    {
-        if (node["meta"] == null)
-            node["meta"] = new JObject();
-
-        node["meta"]["x"] = position.x;
-        node["meta"]["y"] = position.y;
     }
 
     private void CalculateGraphBounds()
@@ -2567,63 +2723,6 @@ public class PlotTalkAI : EditorWindow
             minY - GRAPH_PADDING,
             maxX - minX + GRAPH_PADDING * 2,
             maxY - minY + GRAPH_PADDING * 2
-        );
-    }
-
-    private void ShowNodeContextMenu(JObject node)
-    {
-        var menu = new GenericMenu();
-
-        menu.AddItem(new GUIContent("Удалить узел"), false, () =>
-        {
-            if (EditorUtility.DisplayDialog("Подтверждение", "Удалить этот узел?", "Да", "Нет"))
-            {
-                // Логика удаления узла
-            }
-        });
-
-        menu.AddItem(new GUIContent("Редактировать текст"), false, () =>
-        {
-            // Логика редактирования текста узла
-        });
-
-        menu.AddItem(new GUIContent("Добавить переход"), false, () =>
-        {
-            // Логика добавления перехода
-        });
-
-        menu.ShowAsContext();
-    }
-
-    private void DrawNodeCurve(Vector2 start, Vector2 end, Color color)
-    {
-        // Преобразуем координаты с учетом zoom и pan
-        var startPos = new Vector3(
-            start.x * graphZoom + graphPanOffset.x + graphRect.x,
-            start.y * graphZoom + graphPanOffset.y + graphRect.y,
-            0
-        );
-
-        var endPos = new Vector3(
-            end.x * graphZoom + graphPanOffset.x + graphRect.x,
-            end.y * graphZoom + graphPanOffset.y + graphRect.y,
-            0
-        );
-
-        var startTan = startPos + Vector3.right * 50;
-        var endTan = endPos + Vector3.left * 50;
-
-        Handles.DrawBezier(startPos, endPos, startTan, endTan, color, null, 3f);
-
-        // Рисуем стрелку
-        var arrowDir = (endPos - startPos).normalized;
-        var arrowHead = endPos - arrowDir * 10;
-
-        // Преобразуем все в Vector3 для совместимости
-        Handles.DrawAAConvexPolygon(
-            arrowHead,
-            arrowHead + Quaternion.Euler(0, 0, 30) * -arrowDir * 10,
-            arrowHead + Quaternion.Euler(0, 0, -30) * -arrowDir * 10
         );
     }
 
