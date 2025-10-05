@@ -161,6 +161,14 @@ public class PlotTalkAI : EditorWindow
     string nodeEditText;
     private int nodeEditItem = -1;
 
+    private bool isCreatingLink = false;
+    private JObject linkCreationSource;
+    private Vector2 contextMenuPosition;
+    private bool showContextMenu = false;
+    private JObject contextMenuNode;
+    private JObject contextMenuLink;
+    private JObject contextMenuLinkSource;
+
     private void OnEnable()
     {
         SwitchPage(currentPage);
@@ -1085,7 +1093,7 @@ public class PlotTalkAI : EditorWindow
                                     .DeleteScript((string)selectedGame["id"], sceneId, (string)script["id"]);
                                 selectedGame = StorageApi.GetInstance().GetGameById((string)selectedGame["id"]);
                             }
-                        
+
                         if (GUILayout.Button(EditorGUIUtility.IconContent("Download-Available"), iconButtonStyle))
                         {
                             ExportDialogue((JObject)script);
@@ -1108,158 +1116,158 @@ public class PlotTalkAI : EditorWindow
         GUILayout.Space(50);
         GUILayout.EndArea();
     }
-    
-    /// <summary>
-/// Экспортирует диалог в JSON файл
-/// </summary>
-private void ExportDialogue(JObject script)
-{
-    try
-    {
-        // Получаем имена персонажей
-        var npcName = GetCharacterNameById((string)script["npc"]);
-        var heroName = GetCharacterNameById((string)script["main_character"]);
-        
-        // Создаем структуру для экспорта
-        var exportData = new JArray();
-        
-        if (script["result"] != null && script["result"].HasValues)
-        {
-            var dialogueExport = new JObject
-            {
-                ["id"] = script["id"],
-                ["npc_name"] = npcName,
-                ["hero_name"] = heroName,
-                ["data"] = script["result"]
-            };
-            exportData.Add(dialogueExport);
-        }
-        
-        // Предлагаем выбрать место сохранения
-        var defaultFileName = $"{script["id"]?.ToString() ?? "dialogue"}.json";
-        var defaultFolder = Path.Combine(Application.dataPath, "Resources", "dialogues");
-        
-        // Создаем папку по умолчанию, если не существует
-        if (!Directory.Exists(defaultFolder))
-        {
-            Directory.CreateDirectory(defaultFolder);
-        }
-        
-        var path = EditorUtility.SaveFilePanel(
-            "Экспортировать диалог",
-            defaultFolder,
-            defaultFileName,
-            "json"
-        );
-        
-        if (!string.IsNullOrEmpty(path))
-        {
-            File.WriteAllText(path, exportData.ToString(Newtonsoft.Json.Formatting.Indented));
-            EditorUtility.DisplayDialog("Успех", "Диалог успешно экспортирован", "OK");
-            
-            // Если файл сохранен в папке Assets, обновляем проект
-            if (path.StartsWith(Application.dataPath))
-            {
-                AssetDatabase.Refresh();
-            }
-        }
-    }
-    catch (System.Exception e)
-    {
-        EditorUtility.DisplayDialog("Ошибка", $"Не удалось экспортировать диалог: {e.Message}", "OK");
-    }
-}
 
-/// <summary>
-/// Экспортирует все диалоги сцены в JSON файл
-/// </summary>
-private void ExportSceneDialogs(JObject scene)
-{
-    try
+    /// <summary>
+    /// Экспортирует диалог в JSON файл
+    /// </summary>
+    private void ExportDialogue(JObject script)
     {
-        var sceneDialogs = new JArray();
-        var scripts = scene["scripts"] as JArray;
-        
-        if (scripts == null || scripts.Count == 0)
+        try
         {
-            EditorUtility.DisplayDialog("Информация", "В сцене нет диалогов для экспорта", "OK");
-            return;
-        }
-        
-        foreach (var script in scripts)
-        {
-            var scriptObj = (JObject)script;
-            var npcName = GetCharacterNameById((string)scriptObj["npc"]);
-            var heroName = GetCharacterNameById((string)scriptObj["main_character"]);
-            
-            if (scriptObj["result"] != null && scriptObj["result"].HasValues)
+            // Получаем имена персонажей
+            var npcName = GetCharacterNameById((string)script["npc"]);
+            var heroName = GetCharacterNameById((string)script["main_character"]);
+
+            // Создаем структуру для экспорта
+            var exportData = new JArray();
+
+            if (script["result"] != null && script["result"].HasValues)
             {
                 var dialogueExport = new JObject
                 {
                     ["id"] = script["id"],
                     ["npc_name"] = npcName,
                     ["hero_name"] = heroName,
-                    ["data"] = scriptObj["result"]
+                    ["data"] = script["result"]
                 };
-                sceneDialogs.Add(dialogueExport);
+                exportData.Add(dialogueExport);
             }
-        }
-        
-        if (sceneDialogs.Count == 0)
-        {
-            EditorUtility.DisplayDialog("Информация", "В сцене нет сгенерированных диалогов", "OK");
-            return;
-        }
-        
-        // Предлагаем выбрать место сохранения
-        var defaultFileName = $"{scene["id"]?.ToString() ?? "scene"}.json";
-        var defaultFolder = Path.Combine(Application.dataPath, "Resources", "dialogues");
-        
-        // Создаем папку по умолчанию, если не существует
-        if (!Directory.Exists(defaultFolder))
-        {
-            Directory.CreateDirectory(defaultFolder);
-        }
-        
-        var path = EditorUtility.SaveFilePanel(
-            "Экспортировать диалоги сцены",
-            defaultFolder,
-            defaultFileName,
-            "json"
-        );
-        
-        if (!string.IsNullOrEmpty(path))
-        {
-            File.WriteAllText(path, sceneDialogs.ToString(Newtonsoft.Json.Formatting.Indented));
-            EditorUtility.DisplayDialog("Успех", $"Экспортировано {sceneDialogs.Count} диалогов", "OK");
-            
-            // Если файл сохранен в папке Assets, обновляем проект
-            if (path.StartsWith(Application.dataPath))
-            {
-                AssetDatabase.Refresh();
-            }
-        }
-    }
-    catch (System.Exception e)
-    {
-        EditorUtility.DisplayDialog("Ошибка", $"Не удалось экспортировать диалоги: {e.Message}", "OK");
-    }
-}
 
-/// <summary>
-/// Получает имя персонажа по ID
-/// </summary>
-private string GetCharacterNameById(string characterId)
-{
-    if (selectedGame == null || string.IsNullOrEmpty(characterId))
-        return "Неизвестный персонаж";
-    
-    var characters = selectedGame["characters"] as JArray;
-    if (characters == null) return "Неизвестный персонаж";
-    
-    var character = characters.FirstOrDefault(c => (string)c["id"] == characterId);
-    return character?["name"]?.ToString() ?? "Неизвестный персонаж";
-}
+            // Предлагаем выбрать место сохранения
+            var defaultFileName = $"{script["id"]?.ToString() ?? "dialogue"}.json";
+            var defaultFolder = Path.Combine(Application.dataPath, "Resources", "dialogues");
+
+            // Создаем папку по умолчанию, если не существует
+            if (!Directory.Exists(defaultFolder))
+            {
+                Directory.CreateDirectory(defaultFolder);
+            }
+
+            var path = EditorUtility.SaveFilePanel(
+                "Экспортировать диалог",
+                defaultFolder,
+                defaultFileName,
+                "json"
+            );
+
+            if (!string.IsNullOrEmpty(path))
+            {
+                File.WriteAllText(path, exportData.ToString(Newtonsoft.Json.Formatting.Indented));
+                EditorUtility.DisplayDialog("Успех", "Диалог успешно экспортирован", "OK");
+
+                // Если файл сохранен в папке Assets, обновляем проект
+                if (path.StartsWith(Application.dataPath))
+                {
+                    AssetDatabase.Refresh();
+                }
+            }
+        }
+        catch (System.Exception e)
+        {
+            EditorUtility.DisplayDialog("Ошибка", $"Не удалось экспортировать диалог: {e.Message}", "OK");
+        }
+    }
+
+    /// <summary>
+    /// Экспортирует все диалоги сцены в JSON файл
+    /// </summary>
+    private void ExportSceneDialogs(JObject scene)
+    {
+        try
+        {
+            var sceneDialogs = new JArray();
+            var scripts = scene["scripts"] as JArray;
+
+            if (scripts == null || scripts.Count == 0)
+            {
+                EditorUtility.DisplayDialog("Информация", "В сцене нет диалогов для экспорта", "OK");
+                return;
+            }
+
+            foreach (var script in scripts)
+            {
+                var scriptObj = (JObject)script;
+                var npcName = GetCharacterNameById((string)scriptObj["npc"]);
+                var heroName = GetCharacterNameById((string)scriptObj["main_character"]);
+
+                if (scriptObj["result"] != null && scriptObj["result"].HasValues)
+                {
+                    var dialogueExport = new JObject
+                    {
+                        ["id"] = script["id"],
+                        ["npc_name"] = npcName,
+                        ["hero_name"] = heroName,
+                        ["data"] = scriptObj["result"]
+                    };
+                    sceneDialogs.Add(dialogueExport);
+                }
+            }
+
+            if (sceneDialogs.Count == 0)
+            {
+                EditorUtility.DisplayDialog("Информация", "В сцене нет сгенерированных диалогов", "OK");
+                return;
+            }
+
+            // Предлагаем выбрать место сохранения
+            var defaultFileName = $"{scene["id"]?.ToString() ?? "scene"}.json";
+            var defaultFolder = Path.Combine(Application.dataPath, "Resources", "dialogues");
+
+            // Создаем папку по умолчанию, если не существует
+            if (!Directory.Exists(defaultFolder))
+            {
+                Directory.CreateDirectory(defaultFolder);
+            }
+
+            var path = EditorUtility.SaveFilePanel(
+                "Экспортировать диалоги сцены",
+                defaultFolder,
+                defaultFileName,
+                "json"
+            );
+
+            if (!string.IsNullOrEmpty(path))
+            {
+                File.WriteAllText(path, sceneDialogs.ToString(Newtonsoft.Json.Formatting.Indented));
+                EditorUtility.DisplayDialog("Успех", $"Экспортировано {sceneDialogs.Count} диалогов", "OK");
+
+                // Если файл сохранен в папке Assets, обновляем проект
+                if (path.StartsWith(Application.dataPath))
+                {
+                    AssetDatabase.Refresh();
+                }
+            }
+        }
+        catch (System.Exception e)
+        {
+            EditorUtility.DisplayDialog("Ошибка", $"Не удалось экспортировать диалоги: {e.Message}", "OK");
+        }
+    }
+
+    /// <summary>
+    /// Получает имя персонажа по ID
+    /// </summary>
+    private string GetCharacterNameById(string characterId)
+    {
+        if (selectedGame == null || string.IsNullOrEmpty(characterId))
+            return "Неизвестный персонаж";
+
+        var characters = selectedGame["characters"] as JArray;
+        if (characters == null) return "Неизвестный персонаж";
+
+        var character = characters.FirstOrDefault(c => (string)c["id"] == characterId);
+        return character?["name"]?.ToString() ?? "Неизвестный персонаж";
+    }
 
     private void DrawEditScenePage()
     {
@@ -1697,25 +1705,25 @@ private string GetCharacterNameById(string characterId)
         if (!pageInitialized)
         {
             // Проверяем, есть ли уже расположенные узлы
-            bool needsLayout = selectedScript != null && 
+            bool needsLayout = selectedScript != null &&
                                selectedScript["result"] != null &&
                                selectedScript["result"]["data"] != null &&
                                ((JArray)selectedScript["result"]["data"]).Count > 0 &&
                                !HasNodePositions((JArray)selectedScript["result"]["data"]);
-        
+
             if (needsLayout)
             {
                 AutoLayoutDAG();
             }
-        
+
             pageInitialized = true;
         }
-        
+
         // Сначала обрабатываем ввод
         HandleGraphInput();
 
         // Разделяем область на две части: управление и график
-        float controlPanelHeight = 150f;
+        float controlPanelHeight = 185f;
 
         // Панель управления
         GUILayout.BeginVertical(GUILayout.Height(controlPanelHeight));
@@ -1743,7 +1751,7 @@ private string GetCharacterNameById(string characterId)
         if (showLinkEditor && editingLink != null)
             DrawLinkEditorWindow();
     }
-    
+
     private bool HasNodePositions(JArray nodes)
     {
         foreach (JObject node in nodes)
@@ -1751,6 +1759,7 @@ private string GetCharacterNameById(string characterId)
             if (node["meta"]?["x"] == null || node["meta"]?["y"] == null)
                 return false;
         }
+
         return true;
     }
 
@@ -1901,6 +1910,20 @@ private string GetCharacterNameById(string characterId)
             Repaint();
         }
 
+        // Новая кнопка удаления
+        if (GUILayout.Button("Удалить"))
+        {
+            if (EditorUtility.DisplayDialog("Удалить узел?",
+                    "Вы уверены, что хотите удалить этот узел и все связанные с ним связи?", "Да", "Отмена"))
+            {
+                TakeSnapshot();
+                DeleteNode(editingNode);
+                showNodeEditor = false;
+                windowInitialized = false;
+                Repaint();
+            }
+        }
+
         GUILayout.EndHorizontal();
         GUILayout.Space(10);
         GUILayout.EndVertical();
@@ -2009,6 +2032,21 @@ private string GetCharacterNameById(string characterId)
             Repaint();
         }
 
+        // Новая кнопка удаления
+        if (GUILayout.Button("Удалить"))
+        {
+            if (EditorUtility.DisplayDialog("Удалить связь?",
+                    "Вы уверены, что хотите удалить эту связь?", "Да", "Отмена"))
+            {
+                TakeSnapshot();
+                Debug.Log(editingLinkSourceNode);
+                DeleteLink(editingLinkSourceNode, editingLink);
+                showLinkEditor = false;
+                windowInitialized = false;
+                Repaint();
+            }
+        }
+
         GUILayout.EndHorizontal();
         GUILayout.Space(10);
         GUILayout.EndVertical();
@@ -2076,6 +2114,19 @@ private string GetCharacterNameById(string characterId)
 
             GUILayout.FlexibleSpace();
 
+            // Кнопка создания новой ноды
+            if (GUILayout.Button("Создать фразу", lowButtonStyle))
+            {
+                TakeSnapshot();
+                // Создаем ноду в центре видимой области
+                var center = new Vector2(graphRect.width / 2, graphRect.height / 2);
+                var graphCenter = (center - graphPanOffset) / graphZoom;
+                var newNode = CreateNewNode(graphCenter);
+                selectedNode = newNode;
+            }
+
+            GUILayout.FlexibleSpace();
+
             // Кнопка "Сохранить"
             if (GUILayout.Button("Сохранить", lowButtonStyle, GUILayout.Height(30)))
             {
@@ -2087,10 +2138,10 @@ private string GetCharacterNameById(string characterId)
                 );
                 EditorUtility.DisplayDialog("Успех", "Изменения сохранены", "OK");
             }
-            
+
             GUILayout.FlexibleSpace();
 
-            // Новая кнопка авто-расположения
+            // Кнопка авто-расположения
             if (GUILayout.Button("Авторасстановка", lowButtonStyle, GUILayout.Height(30)))
             {
                 TakeSnapshot();
@@ -2110,10 +2161,84 @@ private string GetCharacterNameById(string characterId)
                     // Очищаем стеки при перезагрузке
                     undoStack.Clear();
                     redoStack.Clear();
+                    selectedNode = null;
                 }
             }
 
             GUILayout.EndHorizontal();
+
+            // Панель управления выделенной нодой
+            if (selectedNode != null)
+            {
+                GUILayout.Space(5);
+
+                GUILayout.BeginHorizontal();
+
+                // Кнопка редактирования ноды
+                if (GUILayout.Button("Редактировать", lowButtonStyle, GUILayout.Height(25)))
+                {
+                    windowInitialized = false;
+                    editingNode = selectedNode;
+                    showNodeEditor = true;
+                    editingNodeScroll = Vector2.zero;
+                }
+
+                // Кнопка создания связи
+                if (GUILayout.Button("Создать связь", lowButtonStyle, GUILayout.Height(25)))
+                {
+                    isCreatingLink = true;
+                    linkCreationSource = selectedNode;
+                }
+
+                // Кнопка создания дочерней ноды
+                if (GUILayout.Button("Создать дочернюю", lowButtonStyle, GUILayout.Height(25)))
+                {
+                    TakeSnapshot();
+                    // Создаем новую ноду со смещением от выбранной
+                    var nodePos = GetNodePosition(selectedNode) + new Vector2(200, 0);
+                    var newNode = CreateNewNode(nodePos);
+
+                    if (newNode != null)
+                    {
+                        // Автоматически создаем связь от выбранной ноды к новой
+                        var newLink = new JObject
+                        {
+                            ["id"] = (int)newNode["id"],
+                            ["line"] = "Новая реплика",
+                            ["info"] = "Новая реплика"
+                        };
+
+                        if (selectedNode["to"] == null)
+                            selectedNode["to"] = new JArray();
+
+                        ((JArray)selectedNode["to"]).Add(newLink);
+
+                        selectedNode = newNode;
+                    }
+                }
+
+                // Кнопка удаления ноды
+                if (GUILayout.Button("Удалить", lowButtonStyle, GUILayout.Height(25)))
+                {
+                    if (EditorUtility.DisplayDialog("Удалить ноду?",
+                            "Вы уверены, что хотите удалить эту ноду и все связанные с ней связи?", "Да", "Отмена"))
+                    {
+                        TakeSnapshot();
+                        DeleteNode(selectedNode);
+                        selectedNode = null;
+                    }
+                }
+
+                GUILayout.EndHorizontal();
+                GUILayout.Space(5);
+            }
+            else
+            {
+                GUILayout.Space(5);
+                GUILayout.Label("Здесь появятся кнопки для управления выбранной фразой...", centeredItalicLabelStyle,
+                    GUILayout.Height(25));
+                GUILayout.Space(5);
+            }
         }
 
         GUILayout.Space(5);
@@ -2126,12 +2251,21 @@ private string GetCharacterNameById(string characterId)
     {
         if (showNodeEditor || showLinkEditor)
             return;
+
         var e = Event.current;
         var mousePos = e.mousePosition;
 
         // Проверяем, находится ли курсор в области графа
         if (!graphRect.Contains(mousePos))
             return;
+
+        if (e.type == EventType.MouseMove)
+        {
+            if (isCreatingLink)
+            {
+                Repaint();
+            }
+        }
 
         // Преобразуем координаты мыши в координаты графа
         var graphMousePos = (mousePos - graphRect.position - graphPanOffset) / graphZoom;
@@ -2179,18 +2313,37 @@ private string GetCharacterNameById(string characterId)
             return;
         }
 
+        // Обработка создания связей
+        if (isCreatingLink && e.type == EventType.MouseDown && e.button == 0)
+        {
+            HandleLinkCreation(graphMousePos);
+            e.Use();
+            return;
+        }
+
         // Обработка кликов по узлам
         if (e.type == EventType.MouseDown && e.button == 0)
         {
+            // Снимаем выделение при клике на пустое место
+            var clickedNode = GetNodeAtPosition(graphMousePos);
+            if (clickedNode == null)
+            {
+                selectedNode = null;
+                e.Use();
+                Repaint();
+                return;
+            }
+
             // Двойной клик - редактирование
             if (e.clickCount == 2)
             {
                 HandleDoubleClick(graphMousePos);
                 e.Use();
             }
-            else // Одинарный клик - начало перетаскивания
+            else // Одинарный клик - выделение и начало перетаскивания
             {
                 TakeSnapshot();
+                selectedNode = clickedNode;
                 HandleNodeSelection(graphMousePos);
                 e.Use();
             }
@@ -2198,26 +2351,21 @@ private string GetCharacterNameById(string characterId)
             return;
         }
 
-        // Перетаскивание узла - ИСПРАВЛЕННАЯ ВЕРСИЯ
+        // Перетаскивание узла
         if (e.type == EventType.MouseDrag && e.button == 0 && selectedNode != null)
         {
-            // Получаем текущую позицию мыши в координатах графа
             var currentGraphMousePos = (mousePos - graphRect.position - graphPanOffset) / graphZoom;
-
-            // Вычисляем дельту перемещения в координатах графа
             var delta = currentGraphMousePos - lastGraphMousePos;
 
             if (selectedNode["meta"] == null)
                 selectedNode["meta"] = new JObject();
 
-            // Получаем текущую позицию и добавляем дельту
             var currentX = (float)(selectedNode["meta"]["x"] ?? 0);
             var currentY = (float)(selectedNode["meta"]["y"] ?? 0);
 
             selectedNode["meta"]["x"] = currentX + delta.x;
             selectedNode["meta"]["y"] = currentY + delta.y;
 
-            // Обновляем последнюю позицию мыши
             lastGraphMousePos = currentGraphMousePos;
 
             e.Use();
@@ -2234,38 +2382,20 @@ private string GetCharacterNameById(string characterId)
         // Завершение перетаскивания узла
         if (e.type == EventType.MouseUp && e.button == 0)
         {
-            selectedNode = null;
+            // Не снимаем выделение при отпускании, только сбрасываем состояние перетаскивания
             e.Use();
             return;
         }
-    }
 
-
-    private void HandleDoubleClick(Vector2 graphMousePos)
-    {
-        if (selectedScript == null || selectedScript["result"] == null)
-            return;
-
-        var nodes = (JArray)selectedScript["result"]["data"];
-        if (nodes == null) return;
-
-        // Ищем узел под курсором в координатах графа
-        foreach (JObject node in nodes)
+        // Отмена создания связи по Escape
+        if (e.type == EventType.KeyDown && e.keyCode == KeyCode.Escape)
         {
-            var nodePos = GetNodePosition(node);
-
-            // Создаем Rect узла в координатах графа (без учета масштаба и панорамирования)
-            var nodeRect = new Rect(nodePos.x, nodePos.y, 180, 50);
-
-            // Проверяем попадание мыши в узел в координатах графа
-            if (nodeRect.Contains(graphMousePos))
+            if (isCreatingLink)
             {
-                windowInitialized = false;
-                editingNode = node;
-                showNodeEditor = true;
-                editingNodeScroll = Vector2.zero;
+                isCreatingLink = false;
+                linkCreationSource = null;
+                e.Use();
                 Repaint();
-                return;
             }
         }
     }
@@ -2285,8 +2415,6 @@ private string GetCharacterNameById(string characterId)
         foreach (JObject node in nodes)
         {
             var nodePos = GetNodePosition(node);
-
-            // Создаем Rect узла в координатах графа (без учета масштаба и панорамирования)
             var nodeRect = new Rect(nodePos.x, nodePos.y, 180, 50);
 
             // Проверяем попадание мыши в узел в координатах графа
@@ -2299,6 +2427,269 @@ private string GetCharacterNameById(string characterId)
 
         // Если кликнули на пустое место - снимаем выделение
         selectedNode = null;
+    }
+
+    private void HandleLinkCreation(Vector2 graphMousePos)
+    {
+        var targetNode = GetNodeAtPosition(graphMousePos);
+
+        if (targetNode != null && targetNode != linkCreationSource)
+        {
+            // Проверяем, не существует ли уже такая связь
+            var existingLinks = (JArray)linkCreationSource["to"];
+            bool linkExists = false;
+
+            if (existingLinks != null)
+            {
+                foreach (JObject link in existingLinks)
+                {
+                    if ((int)link["id"] == (int)targetNode["id"])
+                    {
+                        linkExists = true;
+                        break;
+                    }
+                }
+            }
+
+            // Проверяем, нет ли обратной связи (двусторонней)
+            bool reverseLinkExists = false;
+            var targetLinks = (JArray)targetNode["to"];
+            if (targetLinks != null)
+            {
+                foreach (JObject link in targetLinks)
+                {
+                    if ((int)link["id"] == (int)linkCreationSource["id"])
+                    {
+                        reverseLinkExists = true;
+                        break;
+                    }
+                }
+            }
+
+            if (!linkExists && !reverseLinkExists)
+            {
+                TakeSnapshot();
+
+                // Создаем новую связь
+                var newLink = new JObject
+                {
+                    ["id"] = (int)targetNode["id"],
+                    ["line"] = "Новая реплика",
+                    ["info"] = "Новая реплика"
+                };
+
+                if (linkCreationSource["to"] == null)
+                    linkCreationSource["to"] = new JArray();
+
+                ((JArray)linkCreationSource["to"]).Add(newLink);
+            }
+            else if (linkExists)
+            {
+                EditorUtility.DisplayDialog("Внимание", "Связь между этими нодами уже существует", "OK");
+            }
+            else if (reverseLinkExists)
+            {
+                EditorUtility.DisplayDialog("Внимание", "Двусторонние связи запрещены. Обратная связь уже существует.",
+                    "OK");
+            }
+        }
+        else if (targetNode == linkCreationSource)
+        {
+            EditorUtility.DisplayDialog("Внимание", "Нельзя создать связь ноды с самой собой", "OK");
+        }
+
+        isCreatingLink = false;
+        linkCreationSource = null;
+        Repaint();
+    }
+
+    private void HandleDoubleClick(Vector2 graphMousePos)
+    {
+        if (selectedScript == null || selectedScript["result"] == null)
+            return;
+
+        var nodes = (JArray)selectedScript["result"]["data"];
+        if (nodes == null) return;
+
+        // Проверяем двойной клик по узлу
+        var clickedNode = GetNodeAtPosition(graphMousePos);
+        if (clickedNode != null)
+        {
+            windowInitialized = false;
+            editingNode = clickedNode;
+            showNodeEditor = true;
+            editingNodeScroll = Vector2.zero;
+            Repaint();
+            return;
+        }
+
+        // Двойной клик на пустом месте - создаем новый узел
+        CreateNewNode(graphMousePos);
+    }
+
+    private JObject GetNodeAtPosition(Vector2 graphMousePos)
+    {
+        if (selectedScript == null || selectedScript["result"] == null)
+            return null;
+
+        var nodes = (JArray)selectedScript["result"]["data"];
+        if (nodes == null) return null;
+
+        foreach (JObject node in nodes)
+        {
+            var nodePos = GetNodePosition(node);
+            var nodeRect = new Rect(nodePos.x, nodePos.y, 180, 50);
+
+            if (nodeRect.Contains(graphMousePos))
+                return node;
+        }
+
+        return null;
+    }
+
+    private (JObject sourceNode, JObject link) GetLinkAtPosition(Vector2 graphMousePos)
+    {
+        if (selectedScript == null || selectedScript["result"] == null)
+            return (null, null);
+
+        var nodes = (JArray)selectedScript["result"]["data"];
+        if (nodes == null) return (null, null);
+
+        foreach (JObject node in nodes)
+        {
+            var fromPos = GetNodePosition(node);
+
+            foreach (JObject link in node["to"])
+            {
+                var toId = (int)link["id"];
+                var toNode = nodes.FirstOrDefault(n => (int)n["id"] == toId) as JObject;
+                if (toNode != null)
+                {
+                    var toPos = GetNodePosition(toNode);
+
+                    // Проверяем близость к линии связи
+                    if (IsPointNearLine(graphMousePos, fromPos, toPos, 10f))
+                    {
+                        return (node, link);
+                    }
+                }
+            }
+        }
+
+        return (null, null);
+    }
+
+    private bool IsPointNearLine(Vector2 point, Vector2 lineStart, Vector2 lineEnd, float maxDistance)
+    {
+        // Вычисляем расстояние от точки до линии
+        var lineLength = Vector2.Distance(lineStart, lineEnd);
+        var lineDir = (lineEnd - lineStart).normalized;
+
+        var projection = Vector2.Dot(point - lineStart, lineDir);
+        projection = Mathf.Clamp(projection, 0, lineLength);
+
+        var closestPoint = lineStart + lineDir * projection;
+        var distance = Vector2.Distance(point, closestPoint);
+
+        return distance <= maxDistance;
+    }
+
+    private JObject CreateNewNode(Vector2 position)
+    {
+        if (selectedScript == null || selectedScript["result"] == null) return null;
+
+        TakeSnapshot();
+
+        var nodes = (JArray)selectedScript["result"]["data"];
+        if (nodes == null) return null;
+
+        // Создаем новый узел
+        var newNode = new JObject
+        {
+            ["id"] = GetNextNodeId(nodes),
+            ["line"] = "Новая реплика NPC",
+            ["goal_achieved"] = new JObject
+            {
+                ["info"] = -1
+            },
+            ["to"] = new JArray(),
+            ["meta"] = new JObject
+            {
+                ["x"] = position.x,
+                ["y"] = position.y
+            }
+        };
+
+        nodes.Add(newNode);
+
+        Repaint();
+        return newNode;
+    }
+
+    private void DeleteNode(JObject node)
+    {
+        if (selectedScript == null || selectedScript["result"] == null) return;
+
+        TakeSnapshot();
+
+        var nodes = (JArray)selectedScript["result"]["data"];
+        if (nodes == null) return;
+
+        var nodeId = (int)node["id"];
+
+        // Удаляем узел
+        nodes.Remove(node);
+
+        // Удаляем все связи, ведущие к этому узлу
+        foreach (JObject otherNode in nodes)
+        {
+            var toArray = (JArray)otherNode["to"];
+            if (toArray != null)
+            {
+                for (int i = toArray.Count - 1; i >= 0; i--)
+                {
+                    var link = (JObject)toArray[i];
+                    if ((int)link["id"] == nodeId)
+                    {
+                        toArray.RemoveAt(i);
+                    }
+                }
+            }
+        }
+
+        Repaint();
+    }
+
+    private void DeleteLink(JObject sourceNode, JObject link)
+    {
+        TakeSnapshot();
+
+        var toArray = (JArray)sourceNode["to"];
+        if (toArray != null)
+        {
+            toArray.Remove(link);
+        }
+
+        Repaint();
+    }
+
+    private int GetNextNodeId(JArray nodes)
+    {
+        int maxId = 0;
+        foreach (JObject node in nodes)
+        {
+            var id = (int)node["id"];
+            if (id > maxId) maxId = id;
+        }
+
+        return maxId + 1;
+    }
+
+    private void StartCreatingLink(JObject sourceNode)
+    {
+        isCreatingLink = true;
+        linkCreationSource = sourceNode;
+        showContextMenu = false;
     }
 
     private Vector2 GetNodePosition(JObject node)
@@ -2375,7 +2766,7 @@ private string GetCharacterNameById(string characterId)
                         DrawArrowAlongCurve(endPoint, endTangent);
 
                         // Рисуем текст реплики на связи
-                        DrawLinkText(link, startPoint, endPoint, startTangent, endTangent);
+                        DrawLinkText(link, startPoint, endPoint, startTangent, endTangent, node);
                     }
                 }
             }
@@ -2400,7 +2791,16 @@ private string GetCharacterNameById(string characterId)
                 var nodeStyle = new GUIStyle(EditorStyles.helpBox);
                 nodeStyle.wordWrap = true;
                 nodeStyle.normal.textColor = Color.white;
-                nodeStyle.normal.background = MakeTex(2, 2, new Color(0.3f, 0.3f, 0.3f));
+
+                // Подсветка выделенной ноды
+                if (node == selectedNode)
+                {
+                    nodeStyle.normal.background = MakeTex(2, 2, new Color(0.2f, 0.4f, 0.8f, 0.8f)); // Синяя подсветка
+                }
+                else
+                {
+                    nodeStyle.normal.background = MakeTex(2, 2, new Color(0.3f, 0.3f, 0.3f));
+                }
 
                 // Масштабируем шрифт в зависимости от зума
                 nodeStyle.fontSize = Mathf.RoundToInt(12 * graphZoom);
@@ -2418,10 +2818,38 @@ private string GetCharacterNameById(string characterId)
                 GUI.Box(nodeRect, nodeText, nodeStyle);
             }
         }
+
+        // Отрисовка временной линии при создании связи
+        if (isCreatingLink && linkCreationSource != null)
+        {
+            Handles.BeginGUI();
+
+            var sourcePos = GetNodePosition(linkCreationSource);
+            var sourceRect = new Rect(
+                sourcePos.x * graphZoom + graphPanOffset.x,
+                sourcePos.y * graphZoom + graphPanOffset.y,
+                180 * graphZoom,
+                50 * graphZoom
+            );
+
+            var currentMousePos = Event.current.mousePosition;
+
+            // Рисуем временную линию
+            Handles.color = Color.yellow;
+            Handles.DrawLine(sourceRect.center, currentMousePos);
+
+            // Рисуем стрелку
+            DrawArrowAlongCurve(currentMousePos, sourceRect.center);
+
+            Handles.EndGUI();
+
+            // Изменяем курсор
+            EditorGUIUtility.AddCursorRect(graphRect, MouseCursor.Link);
+        }
     }
 
     private void DrawLinkText(JObject link, Vector2 startPoint, Vector2 endPoint, Vector2 startTangent,
-        Vector2 endTangent)
+        Vector2 endTangent, JObject fromNode)
     {
         // Получаем текст реплики (если есть)
         var linkText = link["line"]?.ToString();
@@ -2470,6 +2898,7 @@ private string GetCharacterNameById(string characterId)
                 windowInitialized = false;
                 editingLink = link;
                 showLinkEditor = true;
+                editingLinkSourceNode = fromNode;
                 linkEditorScroll = Vector2.zero;
                 Event.current.Use();
             }
@@ -2682,135 +3111,135 @@ private string GetCharacterNameById(string characterId)
 
         Repaint();
     }
-    
+
     private void AutoLayoutDAG()
-{
-    if (selectedScript == null || selectedScript["result"] == null) return;
-    
-    var nodes = (JArray)selectedScript["result"]["data"];
-    if (nodes == null || nodes.Count == 0) return;
+    {
+        if (selectedScript == null || selectedScript["result"] == null) return;
 
-    // Вычисляем уровни для каждого узла
-    var levels = CalculateNodeLevels(nodes);
-    
-    // Распределяем узлы по уровням
-    var levelNodes = new Dictionary<int, List<JObject>>();
-    foreach (var kvp in levels)
-    {
-        var level = kvp.Value;
-        if (!levelNodes.ContainsKey(level))
-            levelNodes[level] = new List<JObject>();
-        
-        levelNodes[level].Add(FindNodeById(nodes, kvp.Key));
-    }
-    
-    // Располагаем узлы по уровням
-    float startX = 100f;
-    float startY = 100f;
-    float levelHeight = 120f;
-    float nodeWidth = 180f;
-    
-    foreach (var level in levelNodes.Keys.OrderBy(l => l))
-    {
-        var nodesInLevel = levelNodes[level];
-        float levelWidth = nodesInLevel.Count * (nodeWidth + 20f);
-        float currentX = startX + (position.width - levelWidth) / 2; // центрируем уровень
-        
-        for (int i = 0; i < nodesInLevel.Count; i++)
+        var nodes = (JArray)selectedScript["result"]["data"];
+        if (nodes == null || nodes.Count == 0) return;
+
+        // Вычисляем уровни для каждого узла
+        var levels = CalculateNodeLevels(nodes);
+
+        // Распределяем узлы по уровням
+        var levelNodes = new Dictionary<int, List<JObject>>();
+        foreach (var kvp in levels)
         {
-            var node = nodesInLevel[i];
-            if (node["meta"] == null)
-                node["meta"] = new JObject();
-                
-            node["meta"]["x"] = currentX + i * (nodeWidth + 20f);
-            node["meta"]["y"] = startY + level * levelHeight;
+            var level = kvp.Value;
+            if (!levelNodes.ContainsKey(level))
+                levelNodes[level] = new List<JObject>();
+
+            levelNodes[level].Add(FindNodeById(nodes, kvp.Key));
         }
-    }
-    
-    Repaint();
-}
 
-private Dictionary<int, int> CalculateNodeLevels(JArray nodes)
-{
-    var levels = new Dictionary<int, int>();
-    var visited = new HashSet<int>();
-    
-    // Находим корневые узлы (без входящих связей)
-    var rootNodes = FindRootNodes(nodes);
-    
-    // BFS для определения уровней
-    var queue = new Queue<JObject>();
-    foreach (var root in rootNodes)
-    {
-        levels[(int)root["id"]] = 0;
-        queue.Enqueue(root);
-        visited.Add((int)root["id"]);
-    }
-    
-    while (queue.Count > 0)
-    {
-        var current = queue.Dequeue();
-        var currentLevel = levels[(int)current["id"]];
-        
-        foreach (JObject link in current["to"])
+        // Располагаем узлы по уровням
+        float startX = 100f;
+        float startY = 100f;
+        float levelHeight = 120f;
+        float nodeWidth = 180f;
+
+        foreach (var level in levelNodes.Keys.OrderBy(l => l))
         {
-            var childId = (int)link["id"];
-            var childNode = FindNodeById(nodes, childId);
-            
-            if (childNode != null)
+            var nodesInLevel = levelNodes[level];
+            float levelWidth = nodesInLevel.Count * (nodeWidth + 20f);
+            float currentX = startX + (position.width - levelWidth) / 2; // центрируем уровень
+
+            for (int i = 0; i < nodesInLevel.Count; i++)
             {
-                // Уровень ребенка = максимальный(текущий уровень, уровень родителя + 1)
-                var newLevel = Mathf.Max(
-                    levels.ContainsKey(childId) ? levels[childId] : 0,
-                    currentLevel + 1
-                );
-                
-                levels[childId] = newLevel;
-                
-                if (!visited.Contains(childId))
+                var node = nodesInLevel[i];
+                if (node["meta"] == null)
+                    node["meta"] = new JObject();
+
+                node["meta"]["x"] = currentX + i * (nodeWidth + 20f);
+                node["meta"]["y"] = startY + level * levelHeight;
+            }
+        }
+
+        Repaint();
+    }
+
+    private Dictionary<int, int> CalculateNodeLevels(JArray nodes)
+    {
+        var levels = new Dictionary<int, int>();
+        var visited = new HashSet<int>();
+
+        // Находим корневые узлы (без входящих связей)
+        var rootNodes = FindRootNodes(nodes);
+
+        // BFS для определения уровней
+        var queue = new Queue<JObject>();
+        foreach (var root in rootNodes)
+        {
+            levels[(int)root["id"]] = 0;
+            queue.Enqueue(root);
+            visited.Add((int)root["id"]);
+        }
+
+        while (queue.Count > 0)
+        {
+            var current = queue.Dequeue();
+            var currentLevel = levels[(int)current["id"]];
+
+            foreach (JObject link in current["to"])
+            {
+                var childId = (int)link["id"];
+                var childNode = FindNodeById(nodes, childId);
+
+                if (childNode != null)
                 {
-                    visited.Add(childId);
-                    queue.Enqueue(childNode);
+                    // Уровень ребенка = максимальный(текущий уровень, уровень родителя + 1)
+                    var newLevel = Mathf.Max(
+                        levels.ContainsKey(childId) ? levels[childId] : 0,
+                        currentLevel + 1
+                    );
+
+                    levels[childId] = newLevel;
+
+                    if (!visited.Contains(childId))
+                    {
+                        visited.Add(childId);
+                        queue.Enqueue(childNode);
+                    }
                 }
             }
         }
-    }
-    
-    return levels;
-}
 
-private List<JObject> FindRootNodes(JArray nodes)
-{
-    var nodesWithIncoming = new HashSet<int>();
-    
-    // Находим все узлы, у которых есть входящие связи
-    foreach (JObject node in nodes)
+        return levels;
+    }
+
+    private List<JObject> FindRootNodes(JArray nodes)
     {
-        foreach (JObject link in node["to"])
+        var nodesWithIncoming = new HashSet<int>();
+
+        // Находим все узлы, у которых есть входящие связи
+        foreach (JObject node in nodes)
         {
-            nodesWithIncoming.Add((int)link["id"]);
+            foreach (JObject link in node["to"])
+            {
+                nodesWithIncoming.Add((int)link["id"]);
+            }
         }
-    }
-    
-    // Корневые узлы - те, у которых нет входящих связей
-    var roots = new List<JObject>();
-    foreach (JObject node in nodes)
-    {
-        if (!nodesWithIncoming.Contains((int)node["id"]))
-            roots.Add(node);
-    }
-    
-    // Если все узлы имеют входящие связи, берем узел с минимальным id
-    if (roots.Count == 0 && nodes.Count > 0)
-        roots.Add((JObject)nodes[0]);
-    
-    return roots;
-}
 
-private JObject FindNodeById(JArray nodes, int id)
-{
-    return nodes.FirstOrDefault(n => (int)n["id"] == id) as JObject;
-}
+        // Корневые узлы - те, у которых нет входящих связей
+        var roots = new List<JObject>();
+        foreach (JObject node in nodes)
+        {
+            if (!nodesWithIncoming.Contains((int)node["id"]))
+                roots.Add(node);
+        }
+
+        // Если все узлы имеют входящие связи, берем узел с минимальным id
+        if (roots.Count == 0 && nodes.Count > 0)
+            roots.Add((JObject)nodes[0]);
+
+        return roots;
+    }
+
+    private JObject FindNodeById(JArray nodes, int id)
+    {
+        return nodes.FirstOrDefault(n => (int)n["id"] == id) as JObject;
+    }
 
     private bool LineIntersectsRect(Vector2 start, Vector2 end, Rect rect)
     {
