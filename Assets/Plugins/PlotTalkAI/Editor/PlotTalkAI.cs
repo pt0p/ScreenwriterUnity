@@ -28,6 +28,7 @@ public class PlotTalkAI : EditorWindow
     private const float MIN_ZOOM = 0.3f;
     private const float MAX_ZOOM = 2.0f;
     private const float GRAPH_PADDING = 50f;
+    
     private GUIStyle addCardStyle;
     private GUIStyle arrowButtonStyle;
     private GUIStyle buttonStyle;
@@ -37,6 +38,15 @@ public class PlotTalkAI : EditorWindow
     private GUIStyle centeredItalicLabelStyle;
     private GUIStyle centeredLabelStyle;
     private GUIStyle centeredSmallLabelStyle;
+    private GUIStyle linkStyle;
+    private GUIStyle plusLabelStyle;
+    private GUIStyle plusStyle;
+    private GUIStyle scriptLabelStyle;
+    private GUIStyle iconButtonStyle;
+    private GUIStyle fieldLabelStyle;
+    private GUIStyle textFieldStyle;
+    private GUIStyle zoomLabelStyle;
+
 
     private JObject editingLink;
     private JObject editingLinkSourceNode;
@@ -85,7 +95,6 @@ public class PlotTalkAI : EditorWindow
 
     // edit script
     private string editScriptName;
-    private GUIStyle fieldLabelStyle;
 
     // dropdowns
     private readonly string[] gameGenres =
@@ -101,7 +110,6 @@ public class PlotTalkAI : EditorWindow
     private Vector2 graphPanOffset = Vector2.zero;
     private Rect graphRect;
     private float graphZoom = 1.0f;
-    private GUIStyle iconButtonStyle;
 
     private bool isHoveringLink;
     private bool isPanning;
@@ -109,7 +117,6 @@ public class PlotTalkAI : EditorWindow
     private Vector2 lastMousePosition;
 
     // cashed styles
-    private GUIStyle linkStyle;
     private Vector2 lastGraphMousePos;
 
     // fields
@@ -125,9 +132,6 @@ public class PlotTalkAI : EditorWindow
     private bool playerGetsItem;
     private string playerGetsItemCondition;
     private string playerGetsItemName;
-    private GUIStyle plusLabelStyle;
-    private GUIStyle plusStyle;
-
     private string registerConfirm = "";
 
     // register
@@ -137,7 +141,6 @@ public class PlotTalkAI : EditorWindow
     private readonly Dictionary<long, bool> sceneExpandedStates = new();
 
     private readonly string[] scriptCharacterAttitude = { "Не знаком", "Хорошо", "Нейтрально", "Плохо" };
-    private GUIStyle scriptLabelStyle;
     private Vector2 scrollPosition;
     private JObject selectedCharacter;
 
@@ -154,10 +157,8 @@ public class PlotTalkAI : EditorWindow
     private JObject selectedScene;
     private JObject selectedScript;
     private bool showNodeEditor;
-    private GUIStyle textFieldStyle;
     private int toMainCharacterRelation;
     private int toNpcRelation;
-    private GUIStyle zoomLabelStyle;
     string nodeEditText;
     private int nodeEditItem = -1;
 
@@ -177,11 +178,9 @@ public class PlotTalkAI : EditorWindow
 
     private void OnGUI()
     {
-        var backgroundColor =
-            EditorGUIUtility.isProSkin ? new Color(0.22f, 0.22f, 0.22f) : new Color(0.76f, 0.76f, 0.76f);
-
+        var backgroundColor = EditorGUIUtility.isProSkin ? new Color(0.22f, 0.22f, 0.22f) : new Color(0.96f, 0.96f, 0.96f);
         EditorGUI.DrawRect(new Rect(0, 0, position.width, position.height), backgroundColor);
-
+        
         GUILayout.BeginArea(new Rect(
             20,
             20,
@@ -244,149 +243,154 @@ public class PlotTalkAI : EditorWindow
     }
 
     private void CreateStyles()
+{
+    var textColor = EditorGUIUtility.isProSkin ? Color.white : Color.black;
+    var linkColor = EditorGUIUtility.isProSkin ? new Color(0.85f, 0.85f, 0.85f) : new Color(0.1f, 0.3f, 0.8f);
+    var backgroundColor = EditorGUIUtility.isProSkin ? new Color(0.22f, 0.22f, 0.22f) : new Color(0.96f, 0.96f, 0.96f);
+    var cardBackgroundColor = EditorGUIUtility.isProSkin ? new Color(0.3f, 0.3f, 0.3f) : new Color(1f, 1f, 1f);
+
+    linkStyle = new GUIStyle(EditorStyles.label)
     {
-        var textColor = EditorGUIUtility.isProSkin ? Color.white : Color.black;
-        var linkColor = EditorGUIUtility.isProSkin ? new Color(0.85f, 0.85f, 0.85f) : new Color(0.1f, 0.3f, 0.8f);
+        normal = { textColor = linkColor },
+        hover = { textColor = Color.Lerp(linkColor, Color.white, 0.3f) },
+        alignment = TextAnchor.MiddleCenter,
+        fontSize = 12
+    };
 
-        linkStyle = new GUIStyle(EditorStyles.label)
-        {
-            normal = { textColor = linkColor },
-            hover = { textColor = Color.Lerp(linkColor, Color.white, 0.3f) },
-            alignment = TextAnchor.MiddleCenter,
-            fontSize = 12
-        };
+    centeredLabelStyle = new GUIStyle(EditorStyles.label)
+    {
+        alignment = TextAnchor.MiddleCenter,
+        fontSize = 24,
+        fontStyle = FontStyle.Bold,
+        normal = { textColor = textColor },
+        wordWrap = true
+    };
 
-        centeredLabelStyle = new GUIStyle(EditorStyles.label)
-        {
-            alignment = TextAnchor.MiddleCenter,
-            fontSize = 24,
-            fontStyle = FontStyle.Bold,
-            normal = { textColor = textColor },
-            wordWrap = true
-        };
+    centeredSmallLabelStyle = new GUIStyle(EditorStyles.label)
+    {
+        alignment = TextAnchor.MiddleCenter,
+        fontSize = 20,
+        fontStyle = FontStyle.Bold,
+        normal = { textColor = textColor },
+        wordWrap = true
+    };
 
-        centeredSmallLabelStyle = new GUIStyle(EditorStyles.label)
-        {
-            alignment = TextAnchor.MiddleCenter,
-            fontSize = 20,
-            fontStyle = FontStyle.Bold,
-            normal = { textColor = textColor },
-            wordWrap = true
-        };
+    centeredItalicLabelStyle = new GUIStyle(EditorStyles.label)
+    {
+        alignment = TextAnchor.MiddleCenter,
+        fontSize = 14,
+        fontStyle = FontStyle.Italic,
+        normal = { textColor = textColor },
+        wordWrap = true
+    };
 
-        centeredItalicLabelStyle = new GUIStyle(EditorStyles.label)
-        {
-            alignment = TextAnchor.MiddleCenter,
-            fontSize = 14,
-            fontStyle = FontStyle.Italic,
-            normal = { textColor = textColor },
-            wordWrap = true
-        };
+    fieldLabelStyle = new GUIStyle(EditorStyles.label)
+    {
+        normal = { textColor = textColor },
+        fontSize = 12,
+        margin = new RectOffset(2, 0, 5, 2)
+    };
 
-        fieldLabelStyle = new GUIStyle(EditorStyles.label)
-        {
-            normal = { textColor = textColor },
-            fontSize = 12,
-            margin = new RectOffset(2, 0, 5, 2)
-        };
+    buttonStyle = new GUIStyle(EditorStyles.miniButton)
+    {
+        fontSize = 14,
+        alignment = TextAnchor.MiddleCenter,
+        fontStyle = FontStyle.Bold,
+        fixedHeight = 40
+    };
 
-        buttonStyle = new GUIStyle(EditorStyles.miniButton)
-        {
-            fontSize = 14,
-            alignment = TextAnchor.MiddleCenter,
-            fontStyle = FontStyle.Bold,
-            fixedHeight = 40
-        };
+    lowButtonStyle = new GUIStyle(buttonStyle)
+    {
+        fixedHeight = 30
+    };
 
-        lowButtonStyle = new GUIStyle(buttonStyle)
-        {
-            fixedHeight = 30
-        };
+    textFieldStyle = new GUIStyle(EditorStyles.textField)
+    {
+        fontSize = 14,
+        fixedHeight = 35,
+        padding = new RectOffset(10, 10, 8, 8),
+        alignment = TextAnchor.MiddleLeft,
+        normal = { textColor = textColor }
+    };
 
-        textFieldStyle = new GUIStyle(EditorStyles.textField)
-        {
-            fontSize = 14,
-            fixedHeight = 35,
-            padding = new RectOffset(10, 10, 8, 8),
-            alignment = TextAnchor.MiddleLeft,
-            normal = { textColor = textColor }
-        };
+    // Стиль для карточек игр
+    cardStyle = new GUIStyle(EditorStyles.helpBox)
+    {
+        margin = new RectOffset(5, 5, 10, 10),
+        padding = new RectOffset(15, 15, 15, 15),
+        normal = { background = MakeTex(2, 2, cardBackgroundColor) }
+    };
 
-        // Стиль для карточек игр
-        cardStyle = new GUIStyle(EditorStyles.helpBox)
-        {
-            margin = new RectOffset(5, 5, 10, 10),
-            padding = new RectOffset(15, 15, 15, 15)
-        };
+    addCardStyle = new GUIStyle(EditorStyles.helpBox)
+    {
+        margin = new RectOffset(5, 5, 10, 10),
+        padding = new RectOffset(15, 15, 15, 15),
+        normal = { background = MakeTex(2, 2, cardBackgroundColor) }
+    };
 
-        addCardStyle = new GUIStyle(EditorStyles.helpBox)
-        {
-            margin = new RectOffset(5, 5, 10, 10),
-            padding = new RectOffset(15, 15, 15, 15)
-        };
+    // Стиль для заголовка карточки
+    cardTitleStyle = new GUIStyle(EditorStyles.label)
+    {
+        fontSize = 16,
+        fontStyle = FontStyle.Bold,
+        normal = { textColor = textColor },
+        margin = new RectOffset(0, 0, 5, 10)
+    };
 
-        // Стиль для заголовка карточки
-        cardTitleStyle = new GUIStyle(EditorStyles.label)
-        {
-            fontSize = 16,
-            fontStyle = FontStyle.Bold,
-            normal = { textColor = textColor },
-            margin = new RectOffset(0, 0, 5, 10)
-        };
+    // Стиль для кнопок-иконок
+    iconButtonStyle = new GUIStyle(EditorStyles.miniButton)
+    {
+        fixedWidth = 30,
+        fixedHeight = 30,
+        padding = new RectOffset(0, 0, 0, 0)
+    };
 
-        // Стиль для кнопок-иконок
-        iconButtonStyle = new GUIStyle(EditorStyles.miniButton)
-        {
-            fixedWidth = 30,
-            fixedHeight = 30,
-            padding = new RectOffset(0, 0, 0, 0)
-        };
+    // Стиль для большого плюса
+    plusStyle = new GUIStyle(EditorStyles.label)
+    {
+        fontSize = 64,
+        alignment = TextAnchor.MiddleCenter,
+        fontStyle = FontStyle.Bold,
+        normal = { textColor = textColor }
+    };
 
-        // Стиль для большого плюса
-        plusStyle = new GUIStyle(EditorStyles.label)
-        {
-            fontSize = 64,
-            alignment = TextAnchor.MiddleCenter,
-            fontStyle = FontStyle.Bold,
-            normal = { textColor = EditorGUIUtility.isProSkin ? Color.white : Color.black }
-        };
+    // Стиль для подписи плюса
+    plusLabelStyle = new GUIStyle(EditorStyles.label)
+    {
+        fontSize = 16,
+        alignment = TextAnchor.MiddleCenter,
+        fontStyle = FontStyle.Bold,
+        normal = { textColor = textColor }
+    };
 
-        // Стиль для подписи плюса
-        plusLabelStyle = new GUIStyle(EditorStyles.label)
-        {
-            fontSize = 16,
-            alignment = TextAnchor.MiddleCenter,
-            fontStyle = FontStyle.Bold,
-            normal = { textColor = EditorGUIUtility.isProSkin ? Color.white : Color.black }
-        };
+    // Стиль для кнопки со стрелкой
+    arrowButtonStyle = new GUIStyle(EditorStyles.label)
+    {
+        alignment = TextAnchor.UpperCenter,
+        normal = { textColor = textColor },
+        hover = { textColor = new Color(0.3f, 0.3f, 0.3f) },
+        active = { textColor = new Color(0.3f, 0.3f, 0.3f) },
+        padding = new RectOffset(0, 0, 0, 0),
+        margin = new RectOffset(0, 0, 0, 0),
+        fixedWidth = 20,
+        fixedHeight = 20
+    };
 
-        // Стиль для кнопки со стрелкой
-        arrowButtonStyle = new GUIStyle(EditorStyles.label)
-        {
-            alignment = TextAnchor.UpperCenter,
-            normal = { textColor = Color.white },
-            hover = { textColor = new Color(0.75f, 0.75f, 0.75f) },
-            active = { textColor = new Color(0.75f, 0.75f, 0.75f) },
-            padding = new RectOffset(0, 0, 0, 0),
-            margin = new RectOffset(0, 0, 0, 0),
-            fixedWidth = 20,
-            fixedHeight = 20
-        };
+    scriptLabelStyle = new GUIStyle(EditorStyles.label)
+    {
+        normal = { textColor = textColor },
+        hover = { textColor = new Color(0.3f, 0.3f, 0.3f) },
+        fontSize = 14
+    };
 
-        scriptLabelStyle = new GUIStyle(EditorStyles.label)
-        {
-            normal = { textColor = textColor },
-            hover = { textColor = new Color(0.75f, 0.75f, 0.75f) },
-            fontSize = 14
-        };
+    zoomLabelStyle = new GUIStyle(EditorStyles.label)
+    {
+        normal = { textColor = Color.gray },
+        fontSize = 10,
+        alignment = TextAnchor.LowerRight
+    };
+}
 
-        zoomLabelStyle = new GUIStyle(EditorStyles.label)
-        {
-            normal = { textColor = Color.gray },
-            fontSize = 10,
-            alignment = TextAnchor.LowerRight
-        };
-    }
 
     private void DrawLoginPage()
     {
@@ -1138,7 +1142,7 @@ public class PlotTalkAI : EditorWindow
                     ["id"] = script["id"],
                     ["npc_name"] = npcName,
                     ["hero_name"] = heroName,
-                    ["data"] = script["result"]
+                    ["data"] = script["result"]["data"]
                 };
                 exportData.Add(dialogueExport);
             }
@@ -1207,7 +1211,7 @@ public class PlotTalkAI : EditorWindow
                         ["id"] = script["id"],
                         ["npc_name"] = npcName,
                         ["hero_name"] = heroName,
-                        ["data"] = scriptObj["result"]
+                        ["data"] = scriptObj["result"]["data"]
                     };
                     sceneDialogs.Add(dialogueExport);
                 }
@@ -1846,8 +1850,7 @@ public class PlotTalkAI : EditorWindow
         var windowRect = new Rect(position.width / 2 - 190, position.height / 2 - 190, 380, 380);
 
         // Рисуем фон окна
-        var windowBackground =
-            EditorGUIUtility.isProSkin ? new Color(0.22f, 0.22f, 0.22f) : new Color(0.9f, 0.9f, 0.9f);
+        var windowBackground = EditorGUIUtility.isProSkin ? new Color(0.22f, 0.22f, 0.22f) : new Color(0.98f, 0.98f, 0.98f);
         EditorGUI.DrawRect(windowRect, windowBackground);
 
         GUILayout.BeginArea(windowRect);
@@ -1957,12 +1960,11 @@ public class PlotTalkAI : EditorWindow
         var backgroundColor = new Color(0, 0, 0, 0.5f);
         EditorGUI.DrawRect(new Rect(0, 0, position.width, position.height), backgroundColor);
 
-        // Окно редактирования связи - увеличиваем высоту для лучшего отображения
+        // Окно редактирования связи
         var windowRect = new Rect(position.width / 2 - 190, position.height / 2 - 220, 380, 440);
 
         // Рисуем фон окна
-        var windowBackground =
-            EditorGUIUtility.isProSkin ? new Color(0.22f, 0.22f, 0.22f) : new Color(0.9f, 0.9f, 0.9f);
+        var windowBackground = EditorGUIUtility.isProSkin ? new Color(0.22f, 0.22f, 0.22f) : new Color(0.98f, 0.98f, 0.98f);
         EditorGUI.DrawRect(windowRect, windowBackground);
 
         GUILayout.BeginArea(windowRect);
@@ -2776,48 +2778,54 @@ public class PlotTalkAI : EditorWindow
 
         // 2. Затем рисуем узлы поверх связей
         foreach (JObject node in nodes)
+    {
+        var nodePos = GetNodePosition(node);
+        var nodeRect = new Rect(
+            nodePos.x * graphZoom + graphPanOffset.x,
+            nodePos.y * graphZoom + graphPanOffset.y,
+            180 * graphZoom,
+            50 * graphZoom
+        );
+
+        if (IsNodeVisible(nodeRect, new Rect(0, 0, graphRect.width, graphRect.height)))
         {
-            var nodePos = GetNodePosition(node);
-            var nodeRect = new Rect(
-                nodePos.x * graphZoom + graphPanOffset.x,
-                nodePos.y * graphZoom + graphPanOffset.y,
-                180 * graphZoom,
-                50 * graphZoom
+            // Создаем стиль с масштабируемым шрифтом
+            var nodeStyle = new GUIStyle(EditorStyles.helpBox);
+            nodeStyle.wordWrap = true;
+            nodeStyle.normal.textColor = EditorGUIUtility.isProSkin ? Color.white : Color.black;
+
+            // Подсветка выделенной ноды
+            if (node == selectedNode)
+            {
+                nodeStyle.normal.background = MakeTex(2, 2, 
+                    EditorGUIUtility.isProSkin ? 
+                    new Color(0.2f, 0.4f, 0.8f, 0.8f) : // Синяя подсветка для темной темы
+                    new Color(0.6f, 0.8f, 1f, 0.8f));   // Светло-синяя подсветка для светлой темы
+            }
+            else
+            {
+                nodeStyle.normal.background = MakeTex(2, 2, 
+                    EditorGUIUtility.isProSkin ? 
+                    new Color(0.3f, 0.3f, 0.3f) :       // Темный фон для темной темы
+                    new Color(0.95f, 0.95f, 0.95f));    // Светлый фон для светлой темы
+            }
+
+            // Масштабируем шрифт в зависимости от зума
+            nodeStyle.fontSize = Mathf.RoundToInt(12 * graphZoom);
+
+            // Добавляем отступы, которые также масштабируются
+            nodeStyle.padding = new RectOffset(
+                Mathf.RoundToInt(8 * graphZoom),
+                Mathf.RoundToInt(8 * graphZoom),
+                Mathf.RoundToInt(4 * graphZoom),
+                Mathf.RoundToInt(4 * graphZoom)
             );
 
-            if (IsNodeVisible(nodeRect, new Rect(0, 0, graphRect.width, graphRect.height)))
-            {
-                // Создаем стиль с масштабируемым шрифтом
-                var nodeStyle = new GUIStyle(EditorStyles.helpBox);
-                nodeStyle.wordWrap = true;
-                nodeStyle.normal.textColor = Color.white;
-
-                // Подсветка выделенной ноды
-                if (node == selectedNode)
-                {
-                    nodeStyle.normal.background = MakeTex(2, 2, new Color(0.2f, 0.4f, 0.8f, 0.8f)); // Синяя подсветка
-                }
-                else
-                {
-                    nodeStyle.normal.background = MakeTex(2, 2, new Color(0.3f, 0.3f, 0.3f));
-                }
-
-                // Масштабируем шрифт в зависимости от зума
-                nodeStyle.fontSize = Mathf.RoundToInt(12 * graphZoom);
-
-                // Добавляем отступы, которые также масштабируются
-                nodeStyle.padding = new RectOffset(
-                    Mathf.RoundToInt(8 * graphZoom),
-                    Mathf.RoundToInt(8 * graphZoom),
-                    Mathf.RoundToInt(4 * graphZoom),
-                    Mathf.RoundToInt(4 * graphZoom)
-                );
-
-                // Отрисовка узла с масштабируемым текстом
-                var nodeText = TruncateText(node["line"]?.ToString() ?? "", 10);
-                GUI.Box(nodeRect, nodeText, nodeStyle);
-            }
+            // Отрисовка узла с масштабируемым текстом
+            var nodeText = TruncateText(node["line"]?.ToString() ?? "", 10);
+            GUI.Box(nodeRect, nodeText, nodeStyle);
         }
+    }
 
         // Отрисовка временной линии при создании связи
         if (isCreatingLink && linkCreationSource != null)
