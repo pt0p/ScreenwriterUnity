@@ -110,7 +110,15 @@ namespace Plugins.PlotTalkAI.Utils
         {
             var jsonString = GetDataString();
             var jsonObject = Deserialize(jsonString);
-            return jsonObject.SelectToken("$.user");
+            var user = jsonObject.SelectToken("$.user");
+    
+            // Восстанавливаем токен в BackendApi при загрузке пользователя
+            if (user?["token"] != null)
+            {
+                BackendApi.SetCurrentToken(user["token"].ToString());
+            }
+    
+            return user;
         }
 
         public bool IsLoggedIn()
@@ -121,6 +129,7 @@ namespace Plugins.PlotTalkAI.Utils
         public void LogOut()
         {
             SetDataString("{ \"user\": {} }");
+            BackendApi.ClearToken();
         }
 
         public void LogIn(int userId, string userToken, string userDataString)
@@ -130,12 +139,21 @@ namespace Plugins.PlotTalkAI.Utils
                 Debug.LogError("User already logged in");
             }
 
-            SetDataString("{ \"user\": {\"id\":" + userId + ",\"token\":\"" + userToken + "\",\"data\":" +
-                          userDataString + "} }");
-        }
+            // Устанавливаем токен в BackendApi
+            BackendApi.SetCurrentToken(userToken);
 
-        public void CreateGame()
-        {
+            // Парсим userDataString чтобы убедиться в валидности JSON
+            try
+            {
+                JObject userData = JObject.Parse(userDataString);
+                SetDataString("{ \"user\": {\"id\":" + userId + ",\"token\":\"" + userToken + "\",\"data\":" + userDataString + "} }");
+            }
+            catch (Exception e)
+            {
+                Debug.LogError($"Invalid user data JSON: {e.Message}");
+                // Если невалидный JSON, сохраняем как есть
+                SetDataString("{ \"user\": {\"id\":" + userId + ",\"token\":\"" + userToken + "\",\"data\":" + userDataString + "} }");
+            }
         }
 
         public void CheckAndCreateJsonInProgramData()
@@ -163,10 +181,14 @@ namespace Plugins.PlotTalkAI.Utils
                 return;
             }
 
+            // Сначала обновляем локальные данные
             JObject fullJson = LoadFullJson();
             JArray games = GetGamesArray(fullJson);
             games.Add(game);
             SaveFullJson(fullJson);
+
+            // Затем синхронизируем с сервером
+            SyncWithServer();
         }
 
         public void UpdateGame(string gameId, JObject updatedGame)
@@ -177,6 +199,7 @@ namespace Plugins.PlotTalkAI.Utils
                 return;
             }
 
+            // Сначала обновляем локальные данные
             JObject fullJson = LoadFullJson();
             JArray games = GetGamesArray(fullJson);
 
@@ -184,6 +207,9 @@ namespace Plugins.PlotTalkAI.Utils
             {
                 game.Merge(updatedGame, new JsonMergeSettings { MergeArrayHandling = MergeArrayHandling.Replace });
                 SaveFullJson(fullJson);
+                
+                // Затем синхронизируем с сервером
+                SyncWithServer();
                 return;
             }
 
@@ -198,6 +224,7 @@ namespace Plugins.PlotTalkAI.Utils
                 return;
             }
 
+            // Сначала обновляем локальные данные
             JObject fullJson = LoadFullJson();
             JArray games = GetGamesArray(fullJson);
 
@@ -206,6 +233,9 @@ namespace Plugins.PlotTalkAI.Utils
             {
                 games.Remove(gameToRemove);
                 SaveFullJson(fullJson);
+                
+                // Затем синхронизируем с сервером
+                SyncWithServer();
                 return;
             }
 
@@ -220,6 +250,7 @@ namespace Plugins.PlotTalkAI.Utils
                 return;
             }
 
+            // Сначала обновляем локальные данные
             JObject fullJson = LoadFullJson();
             JArray games = GetGamesArray(fullJson);
 
@@ -233,6 +264,9 @@ namespace Plugins.PlotTalkAI.Utils
             JArray scenes = GetScenesArray(game);
             scenes.Add(scene);
             SaveFullJson(fullJson);
+
+            // Затем синхронизируем с сервером
+            SyncWithServer();
         }
 
         public void UpdateScene(string gameId, long sceneId, JObject updatedScene)
@@ -243,6 +277,7 @@ namespace Plugins.PlotTalkAI.Utils
                 return;
             }
 
+            // Сначала обновляем локальные данные
             JObject fullJson = LoadFullJson();
             JArray games = GetGamesArray(fullJson);
 
@@ -259,6 +294,9 @@ namespace Plugins.PlotTalkAI.Utils
             {
                 scene.Merge(updatedScene, new JsonMergeSettings { MergeArrayHandling = MergeArrayHandling.Replace });
                 SaveFullJson(fullJson);
+                
+                // Затем синхронизируем с сервером
+                SyncWithServer();
                 return;
             }
 
@@ -273,6 +311,7 @@ namespace Plugins.PlotTalkAI.Utils
                 return;
             }
 
+            // Сначала обновляем локальные данные
             JObject fullJson = LoadFullJson();
             JArray games = GetGamesArray(fullJson);
 
@@ -290,6 +329,9 @@ namespace Plugins.PlotTalkAI.Utils
             {
                 scenes.Remove(sceneToRemove);
                 SaveFullJson(fullJson);
+                
+                // Затем синхронизируем с сервером
+                SyncWithServer();
                 return;
             }
 
@@ -304,6 +346,7 @@ namespace Plugins.PlotTalkAI.Utils
                 return;
             }
 
+            // Сначала обновляем локальные данные
             JObject fullJson = LoadFullJson();
             JArray games = GetGamesArray(fullJson);
 
@@ -326,6 +369,9 @@ namespace Plugins.PlotTalkAI.Utils
             JArray scripts = GetScriptsArray(scene);
             scripts.Add(script);
             SaveFullJson(fullJson);
+
+            // Затем синхронизируем с сервером
+            SyncWithServer();
         }
 
         public void UpdateScript(string gameId, long sceneId, string scriptId, JObject updatedScript)
@@ -336,6 +382,7 @@ namespace Plugins.PlotTalkAI.Utils
                 return;
             }
 
+            // Сначала обновляем локальные данные
             JObject fullJson = LoadFullJson();
             JArray games = GetGamesArray(fullJson);
 
@@ -361,6 +408,9 @@ namespace Plugins.PlotTalkAI.Utils
             {
                 script.Merge(updatedScript, new JsonMergeSettings { MergeArrayHandling = MergeArrayHandling.Replace });
                 SaveFullJson(fullJson);
+                
+                // Затем синхронизируем с сервером
+                SyncWithServer();
                 return;
             }
 
@@ -375,6 +425,7 @@ namespace Plugins.PlotTalkAI.Utils
                 return;
             }
 
+            // Сначала обновляем локальные данные
             JObject fullJson = LoadFullJson();
             JArray games = GetGamesArray(fullJson);
 
@@ -401,10 +452,112 @@ namespace Plugins.PlotTalkAI.Utils
             {
                 scripts.Remove(scriptToRemove);
                 SaveFullJson(fullJson);
+                
+                // Затем синхронизируем с сервером
+                SyncWithServer();
                 return;
             }
 
             Debug.LogError($"Script with id {scriptId} not found in scene {sceneId}");
+        }
+
+        public void AddCharacter(string gameId, JObject character)
+        {
+            if (!IsLoggedIn())
+            {
+                Debug.LogError("User must be logged in");
+                return;
+            }
+
+            // Сначала обновляем локальные данные
+            JObject fullJson = LoadFullJson();
+            JArray games = GetGamesArray(fullJson);
+
+            JObject game = games.FirstOrDefault(g => g["id"]?.ToString() == gameId) as JObject;
+            if (game == null)
+            {
+                Debug.LogError($"Game with id {gameId} not found");
+                return;
+            }
+
+            JArray characters = GetCharactersArray(game);
+            characters.Add(character);
+            SaveFullJson(fullJson);
+
+            // Затем синхронизируем с сервером
+            SyncWithServer();
+        }
+
+        public void UpdateCharacter(string gameId, string characterId, JObject updatedCharacter)
+        {
+            if (!IsLoggedIn())
+            {
+                Debug.LogError("User must be logged in");
+                return;
+            }
+
+            // Сначала обновляем локальные данные
+            JObject fullJson = LoadFullJson();
+            JArray games = GetGamesArray(fullJson);
+
+            JObject game = games.FirstOrDefault(g => g["id"]?.ToString() == gameId) as JObject;
+            if (game == null)
+            {
+                Debug.LogError($"Game with id {gameId} not found");
+                return;
+            }
+
+            JArray characters = GetCharactersArray(game);
+
+            for (int i = 0; i < characters.Count; i++)
+            {
+                if (characters[i]["id"]?.ToString() == characterId)
+                {
+                    characters[i] = updatedCharacter;
+                    SaveFullJson(fullJson);
+                    
+                    // Затем синхронизируем с сервером
+                    SyncWithServer();
+                    return;
+                }
+            }
+
+            Debug.LogError($"Character with id {characterId} not found in game {gameId}");
+        }
+
+        public void DeleteCharacter(string gameId, string characterId)
+        {
+            if (!IsLoggedIn())
+            {
+                Debug.LogError("User must be logged in");
+                return;
+            }
+
+            // Сначала обновляем локальные данные
+            JObject fullJson = LoadFullJson();
+            JArray games = GetGamesArray(fullJson);
+
+            JObject game = games.FirstOrDefault(g => g["id"]?.ToString() == gameId) as JObject;
+            if (game == null)
+            {
+                Debug.LogError($"Game with id {gameId} not found");
+                return;
+            }
+
+            JArray characters = GetCharactersArray(game);
+
+            JObject characterToRemove = characters.FirstOrDefault(c => c["id"]?.ToString() == characterId) as JObject;
+            if (characterToRemove != null)
+            {
+                characters.Remove(characterToRemove);
+                SaveFullJson(fullJson);
+                
+                // Затем синхронизируем с сервером
+                SyncWithServer();
+                return;
+            }
+
+            Debug.LogError($"Character with id {characterId} not found in game {gameId}");
         }
 
         // Вспомогательные методы
@@ -476,93 +629,6 @@ namespace Plugins.PlotTalkAI.Utils
             return scene["scripts"] as JArray;
         }
 
-        public void AddCharacter(string gameId, JObject character)
-        {
-            if (!IsLoggedIn())
-            {
-                Debug.LogError("User must be logged in");
-                return;
-            }
-
-            JObject fullJson = LoadFullJson();
-            JArray games = GetGamesArray(fullJson);
-
-            JObject game = games.FirstOrDefault(g => g["id"]?.ToString() == gameId) as JObject;
-            if (game == null)
-            {
-                Debug.LogError($"Game with id {gameId} not found");
-                return;
-            }
-
-            JArray characters = GetCharactersArray(game);
-            characters.Add(character);
-            SaveFullJson(fullJson);
-        }
-
-        public void UpdateCharacter(string gameId, string characterId, JObject updatedCharacter)
-        {
-            if (!IsLoggedIn())
-            {
-                Debug.LogError("User must be logged in");
-                return;
-            }
-
-            JObject fullJson = LoadFullJson();
-            JArray games = GetGamesArray(fullJson);
-
-            JObject game = games.FirstOrDefault(g => g["id"]?.ToString() == gameId) as JObject;
-            if (game == null)
-            {
-                Debug.LogError($"Game with id {gameId} not found");
-                return;
-            }
-
-            JArray characters = GetCharactersArray(game);
-
-            for (int i = 0; i < characters.Count; i++)
-            {
-                if (characters[i]["id"]?.ToString() == characterId)
-                {
-                    characters[i] = updatedCharacter;
-                    SaveFullJson(fullJson);
-                    return;
-                }
-            }
-
-            Debug.LogError($"Character with id {characterId} not found in game {gameId}");
-        }
-
-        public void DeleteCharacter(string gameId, string characterId)
-        {
-            if (!IsLoggedIn())
-            {
-                Debug.LogError("User must be logged in");
-                return;
-            }
-
-            JObject fullJson = LoadFullJson();
-            JArray games = GetGamesArray(fullJson);
-
-            JObject game = games.FirstOrDefault(g => g["id"]?.ToString() == gameId) as JObject;
-            if (game == null)
-            {
-                Debug.LogError($"Game with id {gameId} not found");
-                return;
-            }
-
-            JArray characters = GetCharactersArray(game);
-
-            JObject characterToRemove = characters.FirstOrDefault(c => c["id"]?.ToString() == characterId) as JObject;
-            if (characterToRemove != null)
-            {
-                characters.Remove(characterToRemove);
-                SaveFullJson(fullJson);
-                return;
-            }
-
-            Debug.LogError($"Character with id {characterId} not found in game {gameId}");
-        }
-
         public JArray GetCharactersArray(JObject game)
         {
             if (game["characters"] == null)
@@ -571,6 +637,40 @@ namespace Plugins.PlotTalkAI.Utils
             }
 
             return game["characters"] as JArray;
+        }
+
+        // Новый метод для синхронизации с сервером
+        private void SyncWithServer()
+        {
+            if (!IsLoggedIn())
+            {
+                Debug.LogError("Cannot sync: user is not logged in");
+                return;
+            }
+
+            var fullJson = LoadFullJson();
+            var userData = fullJson["user"]?["data"];
+            if (userData == null)
+            {
+                Debug.LogError("Cannot sync: user data is null");
+                return;
+            }
+
+            BackendApi.UpdateUserData(userData as JObject, (success, response) =>
+            {
+                if (success)
+                {
+                    
+                }
+                else
+                {
+                    Debug.LogError($"Failed to sync data with server: {response?["message"]?.ToString() ?? "Unknown error"}");
+                    // Можно показать диалоговое окно с ошибкой
+                    #if UNITY_EDITOR
+                    UnityEditor.EditorUtility.DisplayDialog("Ошибка синхронизации", "Не удалось синхронизировать данные с сервером", "OK");
+                    #endif
+                }
+            });
         }
     }
 }

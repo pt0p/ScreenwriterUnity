@@ -137,6 +137,8 @@ public class PlotTalkAI : EditorWindow
     // register
     private string registerEmail = "";
     private string registerPassword = "";
+    private string registerName = "";
+    private string registerSurname = "";
 
     private readonly Dictionary<long, bool> sceneExpandedStates = new();
 
@@ -417,14 +419,29 @@ public class PlotTalkAI : EditorWindow
         var buttonRect = GUILayoutUtility.GetRect(GUIContent.none, buttonStyle, GUILayout.Height(40));
         if (GUI.Button(buttonRect, "Войти", buttonStyle))
         {
-            if (!string.IsNullOrEmpty(loginEmail) && loginPassword == "1234")
+            if (!string.IsNullOrEmpty(loginEmail) && !string.IsNullOrEmpty(loginPassword))
             {
-                StorageApi.GetInstance().LogIn(0, "token_will_be_here", "{\"games\":[]}");
-                SwitchPage(Page.Main);
+                BackendApi.Login(loginEmail, loginPassword, (success, message, userData) =>
+                {
+                    if (success)
+                    {
+                        // Сохраняем данные пользователя через StorageApi
+                        StorageApi.GetInstance().LogIn(
+                            0, // userId будет получен от сервера
+                            message, // token
+                            userData.ToString() // user data as string
+                        );
+                        SwitchPage(Page.Main);
+                    }
+                    else
+                    {
+                        EditorUtility.DisplayDialog("Ошибка", message, "OK");
+                    }
+                });
             }
             else
             {
-                EditorUtility.DisplayDialog("Ошибка", "Неверные данные", "OK");
+                EditorUtility.DisplayDialog("Ошибка", "Заполните все поля", "OK");
             }
         }
 
@@ -455,6 +472,16 @@ public class PlotTalkAI : EditorWindow
 
         GUILayout.Space(15);
 
+        GUILayout.Label("Имя", fieldLabelStyle);
+        registerName = EditorGUILayout.TextField(registerName, textFieldStyle);
+
+        GUILayout.Space(15);
+
+        GUILayout.Label("Фамилия", fieldLabelStyle);
+        registerSurname = EditorGUILayout.TextField(registerSurname, textFieldStyle);
+
+        GUILayout.Space(15);
+
         GUILayout.Label("Пароль", fieldLabelStyle);
         registerPassword = EditorGUILayout.PasswordField(registerPassword, textFieldStyle);
 
@@ -469,7 +496,8 @@ public class PlotTalkAI : EditorWindow
         var buttonRect = GUILayoutUtility.GetRect(GUIContent.none, buttonStyle, GUILayout.Height(40));
         if (GUI.Button(buttonRect, "Зарегистрироваться", buttonStyle))
         {
-            if (string.IsNullOrEmpty(registerEmail) || string.IsNullOrEmpty(registerPassword))
+            if (string.IsNullOrEmpty(registerEmail) || string.IsNullOrEmpty(registerPassword) || 
+                string.IsNullOrEmpty(registerName) || string.IsNullOrEmpty(registerSurname))
             {
                 EditorUtility.DisplayDialog("Ошибка", "Заполните все поля", "OK");
             }
@@ -479,8 +507,24 @@ public class PlotTalkAI : EditorWindow
             }
             else
             {
-                EditorUtility.DisplayDialog("Успех", "Регистрация прошла успешно", "OK");
-                SwitchPage(Page.Login);
+                BackendApi.Register(registerEmail, registerName, registerSurname, registerPassword, (success, message) =>
+                {
+                    if (success)
+                    {
+                        EditorUtility.DisplayDialog("Успех", message, "OK");
+                        SwitchPage(Page.Login);
+                        // Очищаем поля после успешной регистрации
+                        registerEmail = "";
+                        registerName = "";
+                        registerSurname = "";
+                        registerPassword = "";
+                        registerConfirm = "";
+                    }
+                    else
+                    {
+                        EditorUtility.DisplayDialog("Ошибка", message, "OK");
+                    }
+                });
             }
         }
 
@@ -498,7 +542,7 @@ public class PlotTalkAI : EditorWindow
     private void DrawMainPage()
     {
         var games = StorageApi.GetInstance().GetGamesArray(StorageApi.GetInstance().LoadFullJson());
-        GUILayout.Label("Добро пожаловать, ТутБудетИмя!", centeredLabelStyle);
+        GUILayout.Label($"Добро пожаловать, {StorageApi.GetInstance().GetUser()?["data"]?["name"] ?? "Ошибка получения имени"} {StorageApi.GetInstance().GetUser()?["data"]?["surname"] ?? "Ошибка получения фамилии"}!", centeredLabelStyle);
         GUILayout.Space(30);
 
         // Рассчитываем доступную ширину с учетом полосы прокрутки
@@ -1422,24 +1466,38 @@ public class PlotTalkAI : EditorWindow
         {
             if (selectedScript != null)
             {
-                editScriptName = (string)selectedScript["name"];
-                editScriptMinMainChar = (int)selectedScript["answers_from_m"];
-                editScriptMaxMainChar = (int)selectedScript["answers_to_m"];
-                editScriptMinDepth = (int)selectedScript["answers_from_n"];
-                editScriptMaxDepth = (int)selectedScript["answers_to_n"];
-                selectedMainCharacterId = (string)selectedScript["main_character"];
-                selectedNPCId = (string)selectedScript["npc"];
-                editScriptDescription = (string)selectedScript["description"];
-                playerGetsInfo = (bool)selectedScript["infoData"]["gets"];
-                playerGetsItem = (bool)selectedScript["itemData"]["gets"];
-                playerGetsInfoName = (string)selectedScript["infoData"]["name"];
-                playerGetsItemName = (string)selectedScript["itemData"]["name"];
-                playerGetsInfoCondition = (string)selectedScript["infoData"]["condition"];
-                playerGetsItemCondition = (string)selectedScript["itemData"]["condition"];
-                editScriptAdditional = (string)selectedScript["additional"];
-                toMainCharacterRelation = Array.IndexOf(scriptCharacterAttitude,
-                    (string)selectedScript["to_main_character_relations"]);
-                toNpcRelation = Array.IndexOf(scriptCharacterAttitude, (string)selectedScript["to_npc_relations"]);
+                editScriptName = (string)selectedScript["name"] ?? "";
+                editScriptMinMainChar = (int)(selectedScript["answers_from_m"] ?? 1);
+                editScriptMaxMainChar = (int)(selectedScript["answers_to_m"] ?? 3);
+                editScriptMinDepth = (int)(selectedScript["answers_from_n"] ?? 1);
+                editScriptMaxDepth = (int)(selectedScript["answers_to_n"] ?? 3);
+                selectedMainCharacterId = (string)selectedScript["main_character"] ?? "";
+                selectedNPCId = (string)selectedScript["npc"] ?? "";
+                editScriptDescription = (string)selectedScript["description"] ?? "";
+                
+                // Безопасная инициализация infoData
+                var infoData = selectedScript["infoData"] as JObject ?? new JObject();
+                playerGetsInfo = (bool)(infoData["gets"] ?? false);
+                playerGetsInfoName = (string)(infoData["name"] ?? "");
+                playerGetsInfoCondition = (string)(infoData["condition"] ?? "");
+                
+                // Безопасная инициализация itemData
+                var itemData = selectedScript["itemData"] as JObject ?? new JObject();
+                playerGetsItem = (bool)(itemData["gets"] ?? false);
+                playerGetsItemName = (string)(itemData["name"] ?? "");
+                playerGetsItemCondition = (string)(itemData["condition"] ?? "");
+                
+                editScriptAdditional = (string)selectedScript["additional"] ?? "";
+                
+                // Безопасная инициализация отношений
+                var toMainCharacterRelations = (string)selectedScript["to_main_character_relations"] ?? scriptCharacterAttitude[0];
+                var toNpcRelations = (string)selectedScript["to_npc_relations"] ?? scriptCharacterAttitude[0];
+                
+                toMainCharacterRelation = Array.IndexOf(scriptCharacterAttitude, toMainCharacterRelations);
+                if (toMainCharacterRelation == -1) toMainCharacterRelation = 0;
+                
+                toNpcRelation = Array.IndexOf(scriptCharacterAttitude, toNpcRelations);
+                if (toNpcRelation == -1) toNpcRelation = 0;
             }
             else
             {
@@ -1461,7 +1519,7 @@ public class PlotTalkAI : EditorWindow
         GUILayout.Space(30);
 
         // Рассчитываем доступную высоту для ScrollView
-        var availableHeight = CalculateAvailableHeight(); // 120 - примерная высота заголовка и кнопок
+        var availableHeight = CalculateAvailableHeight();
 
         // Начинаем ScrollView с фиксированной высотой
         scrollPosition = GUILayout.BeginScrollView(scrollPosition, false, false,
@@ -1497,8 +1555,9 @@ public class PlotTalkAI : EditorWindow
         GUILayout.Space(5);
         GUILayout.Label(" Главный персонаж", cardTitleStyle);
         GUILayout.Space(5);
-        var sceneCharacterIds = ((JArray)selectedScene["characters"]).ToObject<string[]>();
-        var availableCharacters = ((JArray)selectedGame["characters"])
+        
+        var sceneCharacterIds = ((JArray)selectedScene["characters"] ?? new JArray()).ToObject<string[]>();
+        var availableCharacters = ((JArray)selectedGame["characters"] ?? new JArray())
             .Where(c => sceneCharacterIds.Contains((string)c["id"]))
             .ToArray();
 
@@ -1526,10 +1585,12 @@ public class PlotTalkAI : EditorWindow
         GUILayout.Space(5);
         GUILayout.Label(" NPC", cardTitleStyle);
         GUILayout.Space(5);
+        
         // Отрисовка dropdown
         selectedNPCIndex = EditorGUILayout.Popup(selectedNPCIndex, characterNames);
         selectedNPCId = characterIds[selectedNPCIndex];
         GUILayout.Space(5);
+        
         EditorGUILayout.BeginHorizontal();
         GUILayout.Label("Отношение к главному персонажу");
         toMainCharacterRelation = EditorGUILayout.Popup(toMainCharacterRelation, scriptCharacterAttitude);
@@ -1539,24 +1600,26 @@ public class PlotTalkAI : EditorWindow
         GUILayout.Space(15);
         GUILayout.Label("Краткое содержание", centeredSmallLabelStyle);
         GUILayout.Space(15);
-        editScriptDescription = EditorGUILayout.TextArea(editScriptDescription,
-            GUILayout.Height(60));
+        editScriptDescription = EditorGUILayout.TextArea(editScriptDescription, GUILayout.Height(60));
         GUILayout.Space(30);
 
+        // Сохраняем предыдущие значения перед изменением
+        bool previousPlayerGetsItem = playerGetsItem;
+        
         EditorGUILayout.BeginHorizontal();
         GUILayout.Label("Персонаж получит предмет");
         playerGetsItem = EditorGUILayout.Toggle(playerGetsItem, GUILayout.Width(20));
-        if (!playerGetsItem)
+        GUILayout.FlexibleSpace();
+        EditorGUILayout.EndHorizontal();
+
+        // Очищаем поля только если значение изменилось с true на false
+        if (previousPlayerGetsItem && !playerGetsItem)
         {
             playerGetsItemName = "";
             playerGetsItemCondition = "";
         }
 
-        GUILayout.FlexibleSpace();
-        EditorGUILayout.EndHorizontal();
-
         EditorGUI.BeginDisabledGroup(!playerGetsItem);
-
         GUILayout.Label("Предмет", fieldLabelStyle);
         playerGetsItemName = EditorGUILayout.TextField(playerGetsItemName, textFieldStyle);
         GUILayout.Space(15);
@@ -1566,33 +1629,34 @@ public class PlotTalkAI : EditorWindow
 
         GUILayout.Space(30);
 
+        // Сохраняем предыдущие значения перед изменением
+        bool previousPlayerGetsInfo = playerGetsInfo;
+        
         EditorGUILayout.BeginHorizontal();
         GUILayout.Label("Персонаж получит информацию");
         playerGetsInfo = EditorGUILayout.Toggle(playerGetsInfo, GUILayout.Width(20));
-        if (!playerGetsInfo)
+        GUILayout.FlexibleSpace();
+        EditorGUILayout.EndHorizontal();
+
+        // Очищаем поля только если значение изменилось с true на false
+        if (previousPlayerGetsInfo && !playerGetsInfo)
         {
             playerGetsInfoName = "";
             playerGetsInfoCondition = "";
         }
 
-        GUILayout.FlexibleSpace();
-        EditorGUILayout.EndHorizontal();
-
         EditorGUI.BeginDisabledGroup(!playerGetsInfo);
-
         GUILayout.Label("Информация", fieldLabelStyle);
         playerGetsInfoName = EditorGUILayout.TextField(playerGetsInfoName, textFieldStyle);
         GUILayout.Space(15);
         GUILayout.Label("Условие достижения", fieldLabelStyle);
         playerGetsInfoCondition = EditorGUILayout.TextField(playerGetsInfoCondition, textFieldStyle);
-
         EditorGUI.EndDisabledGroup();
 
         GUILayout.Space(30);
         GUILayout.Label("Дополнительно", centeredSmallLabelStyle);
         GUILayout.Space(15);
-        editScriptAdditional = EditorGUILayout.TextArea(editScriptAdditional,
-            GUILayout.Height(60));
+        editScriptAdditional = EditorGUILayout.TextArea(editScriptAdditional, GUILayout.Height(60));
 
         GUILayout.Space(15);
 
@@ -1600,97 +1664,46 @@ public class PlotTalkAI : EditorWindow
 
         GUILayout.Space(15);
 
-        if (GUILayout.Button("Сохранить", buttonStyle, GUILayout.Height(40)))
+        // КНОПКИ - разделяем логику для нового и существующего скрипта
+        if (selectedScript == null)
         {
-            if (!string.IsNullOrEmpty(editScriptName) && editScriptMinMainChar > 0 && editScriptMaxMainChar > 0 &&
-                editScriptMinDepth > 0 && editScriptMaxDepth > 0 && !string.IsNullOrEmpty(editScriptDescription))
+            // Для нового скрипта - только одна кнопка "Сохранить и сгенерировать"
+            if (GUILayout.Button("Сохранить и сгенерировать", buttonStyle, GUILayout.Height(40)))
             {
-                if (selectedScript != null)
+                if (ValidateScriptFields())
                 {
-                    var updScript = new JObject
-                    {
-                        ["name"] = editScriptName,
-                        ["answers_from_m"] = editScriptMinMainChar,
-                        ["answers_to_m"] = editScriptMaxMainChar,
-                        ["answers_from_n"] = editScriptMinDepth,
-                        ["answers_to_n"] = editScriptMaxDepth,
-                        ["main_character"] = selectedMainCharacterId,
-                        ["npc"] = selectedNPCId,
-                        ["to_main_character_relations"] = scriptCharacterAttitude[toMainCharacterRelation],
-                        ["to_npc_relations"] = scriptCharacterAttitude[toNpcRelation],
-                        ["description"] = editScriptDescription,
-                        ["infoData"] = new JObject
-                        {
-                            ["gets"] = playerGetsInfo,
-                            ["name"] = playerGetsInfoName,
-                            ["condition"] = playerGetsInfoCondition
-                        },
-                        ["itemData"] = new JObject
-                        {
-                            ["gets"] = playerGetsItem,
-                            ["name"] = playerGetsItemName,
-                            ["condition"] = playerGetsItemCondition
-                        },
-                        ["additional"] = editScriptAdditional
-                    };
-                    StorageApi.GetInstance().UpdateScript((string)selectedGame["id"], (long)selectedScene["id"],
-                        (string)selectedScript["id"], updScript);
-                    ClearEditScriptPageFields();
-                    selectedScript = null;
-                    selectedGame = StorageApi.GetInstance().GetGameById((string)selectedGame["id"]);
-                    selectedScene = StorageApi.GetInstance()
-                        .GetSceneById((string)selectedGame["id"], (long)selectedScene["id"]);
-                    SwitchPage(Page.GameDetail);
-                }
-                else
-                {
-                    var newScript = new JObject
-                    {
-                        ["id"] = DateTimeOffset.Now.ToUnixTimeSeconds().ToString(),
-                        ["result"] = new JObject(),
-                        ["name"] = editScriptName,
-                        ["answers_from_m"] = editScriptMinMainChar,
-                        ["answers_to_m"] = editScriptMaxMainChar,
-                        ["answers_from_n"] = editScriptMinDepth,
-                        ["answers_to_n"] = editScriptMaxDepth,
-                        ["main_character"] = selectedMainCharacterId,
-                        ["npc"] = selectedNPCId,
-                        ["to_main_character_relations"] = scriptCharacterAttitude[toMainCharacterRelation],
-                        ["to_npc_relations"] = scriptCharacterAttitude[toNpcRelation],
-                        ["description"] = editScriptDescription,
-                        ["infoData"] = new JObject
-                        {
-                            ["gets"] = playerGetsInfo,
-                            ["name"] = playerGetsInfoName,
-                            ["condition"] = playerGetsInfoCondition
-                        },
-                        ["itemData"] = new JObject
-                        {
-                            ["gets"] = playerGetsItem,
-                            ["name"] = playerGetsItemName,
-                            ["condition"] = playerGetsItemCondition
-                        },
-                        ["additional"] = editScriptAdditional
-                    };
-                    StorageApi.GetInstance()
-                        .AddScript((string)selectedGame["id"], (long)selectedScene["id"], newScript);
-                    ClearEditScriptPageFields();
-                    selectedScript = null;
-                    selectedGame = StorageApi.GetInstance().GetGameById((string)selectedGame["id"]);
-                    selectedScene = StorageApi.GetInstance()
-                        .GetSceneById((string)selectedGame["id"], (long)selectedScene["id"]);
-                    SwitchPage(Page.GameDetail);
+                    SaveAndGenerateScript();
                 }
             }
-            else
+        }
+        else
+        {
+            // Для существующего скрипта - две кнопки
+            GUILayout.BeginHorizontal();
+        
+            if (GUILayout.Button("Сохранить", buttonStyle, GUILayout.Height(40)))
             {
-                EditorUtility.DisplayDialog("Ошибка", "Все поля обязательны для заполнения", "OK");
+                if (ValidateScriptFields())
+                {
+                    SaveScriptOnly();
+                }
             }
+        
+            if (GUILayout.Button("Перегенерировать", buttonStyle, GUILayout.Height(40)))
+            {
+                if (ValidateScriptFields())
+                {
+                    SaveAndGenerateScript();
+                }
+            }
+        
+            GUILayout.EndHorizontal();
         }
 
         GUILayout.Space(5);
 
         if (GUILayout.Button("Отменить", buttonStyle, GUILayout.Height(40)))
+        {
             if (EditorUtility.DisplayDialog("Вы уверены?",
                     "После того, как вы нажмете на кнопку \"Да\", все внесенные изменения сбросятся.",
                     "Да", "Отмена"))
@@ -1699,9 +1712,223 @@ public class PlotTalkAI : EditorWindow
                 ClearEditScriptPageFields();
                 SwitchPage(Page.GameDetail);
             }
+        }
 
         GUILayout.EndVertical();
         GUILayout.EndArea();
+    }
+    
+    private bool ValidateScriptFields()
+    {
+        if (string.IsNullOrEmpty(editScriptName) || 
+            editScriptMinMainChar <= 0 || 
+            editScriptMaxMainChar <= 0 ||
+            editScriptMinDepth <= 0 || 
+            editScriptMaxDepth <= 0 ||
+            string.IsNullOrEmpty(editScriptDescription))
+        {
+            EditorUtility.DisplayDialog("Ошибка", "Все поля обязательны для заполнения", "OK");
+            return false;
+        }
+        
+        if (editScriptMinMainChar > editScriptMaxMainChar)
+        {
+            EditorUtility.DisplayDialog("Ошибка", "Минимальное количество ответов не может быть больше максимального", "OK");
+            return false;
+        }
+        
+        if (editScriptMinDepth > editScriptMaxDepth)
+        {
+            EditorUtility.DisplayDialog("Ошибка", "Минимальная глубина не может быть больше максимальной", "OK");
+            return false;
+        }
+        
+        return true;
+    }
+
+    private void SaveScriptOnly()
+    {
+        var scriptData = CreateScriptData(selectedScript["result"] as JObject);
+        
+        if (selectedScript != null)
+        {
+            // Обновляем существующий скрипт
+            StorageApi.GetInstance().UpdateScript((string)selectedGame["id"], (long)selectedScene["id"],
+                (string)selectedScript["id"], scriptData);
+        }
+        else
+        {
+            // Создаем новый скрипт
+            scriptData["id"] = DateTimeOffset.Now.ToUnixTimeSeconds().ToString();
+            scriptData["result"] = new JObject();
+            StorageApi.GetInstance().AddScript((string)selectedGame["id"], (long)selectedScene["id"], scriptData);
+            selectedScript = scriptData;
+        }
+        
+        // Обновляем данные
+        selectedGame = StorageApi.GetInstance().GetGameById((string)selectedGame["id"]);
+        selectedScene = StorageApi.GetInstance().GetSceneById((string)selectedGame["id"], (long)selectedScene["id"]);
+        selectedScript = null;
+        
+        EditorUtility.DisplayDialog("Успех", "Диалог сохранен", "OK");
+        SwitchPage(Page.GameDetail);
+    }
+
+    private void SaveAndGenerateScript()
+    {
+        var scriptData = selectedScript != null ? CreateScriptData(selectedScript["result"] as JObject) : CreateScriptData(null);
+        
+        // Сначала сохраняем скрипт
+        if (selectedScript != null)
+        {
+            StorageApi.GetInstance().UpdateScript((string)selectedGame["id"], (long)selectedScene["id"],
+                (string)selectedScript["id"], scriptData);
+        }
+        else
+        {
+            scriptData["id"] = DateTimeOffset.Now.ToUnixTimeSeconds().ToString();
+            scriptData["result"] = new JObject();
+            StorageApi.GetInstance().AddScript((string)selectedGame["id"], (long)selectedScene["id"], scriptData);
+            selectedScript = scriptData;
+        }
+        
+        // Затем генерируем диалог
+        GenerateDialogue();
+    }
+
+    private JObject CreateScriptData(JObject existingScript)
+    {
+        return new JObject
+        {
+            ["name"] = editScriptName,
+            ["answers_from_m"] = editScriptMinMainChar,
+            ["answers_to_m"] = editScriptMaxMainChar,
+            ["answers_from_n"] = editScriptMinDepth,
+            ["answers_to_n"] = editScriptMaxDepth,
+            ["main_character"] = selectedMainCharacterId,
+            ["npc"] = selectedNPCId,
+            ["to_main_character_relations"] = scriptCharacterAttitude[toMainCharacterRelation],
+            ["to_npc_relations"] = scriptCharacterAttitude[toNpcRelation],
+            ["description"] = editScriptDescription,
+            ["infoData"] = new JObject
+            {
+                ["gets"] = playerGetsInfo,
+                ["name"] = playerGetsInfoName,
+                ["condition"] = playerGetsInfoCondition
+            },
+            ["itemData"] = new JObject
+            {
+                ["gets"] = playerGetsItem,
+                ["name"] = playerGetsItemName,
+                ["condition"] = playerGetsItemCondition
+            },
+            ["additional"] = editScriptAdditional,
+            ["result"] = existingScript ?? new JObject()
+        };
+    }
+
+    private void GenerateDialogue()
+    {
+        // Получаем данные персонажей
+        var npcCharacter = GetCharacterById(selectedNPCId);
+        var heroCharacter = GetCharacterById(selectedMainCharacterId);
+        
+        if (npcCharacter == null || heroCharacter == null)
+        {
+            EditorUtility.DisplayDialog("Ошибка", "Не удалось найти данные персонажей", "OK");
+            return;
+        }
+
+        // Формируем цели
+        var goals = new JArray();
+        
+        if (playerGetsInfo)
+        {
+            goals.Add(new JObject
+            {
+                ["type"] = "info",
+                ["object"] = playerGetsInfoName,
+                ["condition"] = playerGetsInfoCondition
+            });
+        }
+        
+        if (playerGetsItem)
+        {
+            goals.Add(new JObject
+            {
+                ["type"] = "item", 
+                ["object"] = playerGetsItemName,
+                ["condition"] = playerGetsItemCondition
+            });
+        }
+
+        // Формируем данные для запроса
+        var requestData = new JObject
+        {
+            ["npc"] = new JObject
+            {
+                ["name"] = npcCharacter["name"]?.ToString() ?? "",
+                ["profession"] = npcCharacter["profession"]?.ToString() ?? "",
+                ["talk_style"] = npcCharacter["talk_style"]?.ToString() ?? "",
+                ["traits"] = npcCharacter["traits"]?.ToString() ?? "",
+                ["look"] = npcCharacter["look"]?.ToString() ?? "",
+                ["extra"] = npcCharacter["extra"]?.ToString() ?? ""
+            },
+            ["hero"] = new JObject
+            {
+                ["name"] = heroCharacter["name"]?.ToString() ?? "",
+                ["profession"] = heroCharacter["profession"]?.ToString() ?? "",
+                ["talk_style"] = heroCharacter["talk_style"]?.ToString() ?? "",
+                ["traits"] = heroCharacter["traits"]?.ToString() ?? "",
+                ["look"] = heroCharacter["look"]?.ToString() ?? "",
+                ["extra"] = heroCharacter["extra"]?.ToString() ?? ""
+            },
+            ["world_settings"] = selectedGame["description"]?.ToString() ?? "",
+            ["NPC_to_hero_relation"] = scriptCharacterAttitude[toNpcRelation],
+            ["hero_to_NPC_relation"] = scriptCharacterAttitude[toMainCharacterRelation],
+            ["mx_answers_cnt"] = editScriptMaxMainChar,
+            ["mn_answers_cnt"] = editScriptMinMainChar,
+            ["mx_depth"] = editScriptMaxDepth,
+            ["mn_depth"] = editScriptMinDepth,
+            ["scene"] = selectedScene["description"]?.ToString() ?? "",
+            ["genre"] = selectedGame["genre"]?.ToString() ?? "",
+            ["epoch"] = selectedGame["techLevel"]?.ToString() ?? "",
+            ["tonality"] = selectedGame["tonality"]?.ToString() ?? "",
+            ["extra"] = editScriptAdditional ?? "",
+            ["context"] = editScriptDescription ?? "",
+            ["goals"] = goals,
+            ["game_id"] = selectedGame["id"]?.ToString() ?? "",
+            ["scene_id"] = selectedScene["id"]?.ToString() ?? "",
+            ["script_id"] = selectedScript["id"]?.ToString() ?? ""
+        };
+        
+        selectedGame = StorageApi.GetInstance().GetGameById((string)selectedGame["id"]);
+        selectedScene = StorageApi.GetInstance().GetSceneById((string)selectedGame["id"], (long)selectedScene["id"]);
+        selectedScript = StorageApi.GetInstance().GetScriptById((string)selectedGame["id"], (long)selectedScene["id"], (string)selectedScript["id"]);
+        SwitchPage(Page.GraphEditor);
+
+        // Отправляем запрос на генерацию
+        BackendApi.GenerateDialogue(requestData, (success, response) =>
+        {
+            if (success)
+            {
+                EditorUtility.DisplayDialog("Успех", "Диалог успешно сгенерирован. Чтобы увидеть результат, перезагрузите диалог", "OK");
+            }
+            else
+            {
+                string errorMessage = response?["message"]?.ToString() ?? "Неизвестная ошибка";
+                EditorUtility.DisplayDialog("Ошибка генерации", $"Не удалось сгенерировать диалог: {errorMessage}", "OK");
+            }
+        });
+    }
+
+    private JObject GetCharacterById(string characterId)
+    {
+        if (string.IsNullOrEmpty(characterId) || selectedGame == null)
+            return null;
+            
+        var characters = StorageApi.GetInstance().GetCharactersArray(selectedGame);
+        return characters?.FirstOrDefault(c => (string)c["id"] == characterId) as JObject;
     }
 
     private void DrawGraphEditorPage()
@@ -2041,7 +2268,6 @@ public class PlotTalkAI : EditorWindow
                     "Вы уверены, что хотите удалить эту связь?", "Да", "Отмена"))
             {
                 TakeSnapshot();
-                Debug.Log(editingLinkSourceNode);
                 DeleteLink(editingLinkSourceNode, editingLink);
                 showLinkEditor = false;
                 windowInitialized = false;
@@ -2152,18 +2378,14 @@ public class PlotTalkAI : EditorWindow
 
             GUILayout.FlexibleSpace();
 
+            // В методе DrawGraphControlPanel() замените код кнопки обновления:
             if (GUILayout.Button(EditorGUIUtility.IconContent("d_Refresh"), iconButtonStyle))
             {
-                if (EditorUtility.DisplayDialog("Вы уверены?", "Все несохраненные изменения будут сброшены!",
-                        "Да, перезагрузить", "Отмена"))
+                if (EditorUtility.DisplayDialog("Обновить данные?", 
+                        "Вы хотите загрузить последнюю версию данных с сервера? Все несохраненные локальные изменения будут потеряны.", 
+                        "Да, обновить", "Отмена"))
                 {
-                    selectedScript = StorageApi.GetInstance().GetScriptById((string)selectedGame["id"],
-                        (long)selectedScene["id"], (string)selectedScript["id"]);
-                    ResetGraphView();
-                    // Очищаем стеки при перезагрузке
-                    undoStack.Clear();
-                    redoStack.Clear();
-                    selectedNode = null;
+                    SyncDataFromServer();
                 }
             }
 
@@ -2247,6 +2469,73 @@ public class PlotTalkAI : EditorWindow
         GUILayout.EndVertical();
         GUILayout.Space(5);
         GUILayout.EndHorizontal();
+    }
+    
+    private void SyncDataFromServer()
+    {
+        if (!StorageApi.GetInstance().IsLoggedIn())
+        {
+            EditorUtility.DisplayDialog("Ошибка", "Пользователь не авторизован", "OK");
+            return;
+        }
+
+        // Показываем индикатор загрузки
+        EditorUtility.DisplayProgressBar("Синхронизация", "Загрузка данных с сервера...", 0.5f);
+
+        try
+        {
+            // Получаем актуальные данные с сервера
+            BackendApi.GetUserDataFromServer((success, serverData) =>
+            {
+                EditorUtility.ClearProgressBar();
+                
+                if (success)
+                {
+                    try
+                    {
+                        // Загружаем текущий локальный файл
+                        var fullJson = StorageApi.GetInstance().LoadFullJson();
+                        
+                        // Сохраняем токен и ID пользователя, заменяем только данные
+                        var currentUser = fullJson["user"];
+                        currentUser["data"] = serverData;
+                        
+                        // Сохраняем обновленный файл
+                        StorageApi.GetInstance().SetDataString(StorageApi.Serialize(fullJson));
+                        
+                        // Перезагружаем текущую игру, сцену и скрипт из обновленных данных
+                        selectedGame = StorageApi.GetInstance().GetGameById((string)selectedGame["id"]);
+                        selectedScene = StorageApi.GetInstance().GetSceneById((string)selectedGame["id"], (long)selectedScene["id"]);
+                        selectedScript = StorageApi.GetInstance().GetScriptById((string)selectedGame["id"], (long)selectedScene["id"], (string)selectedScript["id"]);
+
+                        ResetGraphView();
+                        
+                        // Очищаем стеки при перезагрузке
+                        undoStack.Clear();
+                        redoStack.Clear();
+                        selectedNode = null;
+                        
+                        EditorUtility.DisplayDialog("Успех", "Данные успешно загружены с сервера", "OK");
+                        Repaint();
+                    }
+                    catch (Exception e)
+                    {
+                        EditorUtility.DisplayDialog("Ошибка", $"Ошибка при обновлении локальных данных: {e.Message}", "OK");
+                    }
+                }
+                else
+                {
+                    string errorMessage = serverData?["message"]?.ToString() ?? "Неизвестная ошибка";
+                    EditorUtility.DisplayDialog("Ошибка синхронизации", 
+                        $"Не удалось загрузить данные с сервера: {errorMessage}", "OK");
+                }
+            });
+        }
+        catch (Exception e)
+        {
+            EditorUtility.ClearProgressBar();
+            EditorUtility.DisplayDialog("Ошибка", $"Ошибка при синхронизации: {e.Message}", "OK");
+        }
     }
 
     private void HandleGraphInput()
@@ -3097,26 +3386,24 @@ public class PlotTalkAI : EditorWindow
 
     private void ResetGraphView()
     {
+        graphZoom = 1.0f;
+        graphPanOffset = Vector2.zero;
+        isPanning = false;
+        selectedNode = null;
+    
+        // Пересчитываем границы графа
         CalculateGraphBounds();
-
-        if (graphBounds.width == 0 || graphBounds.height == 0)
+    
+        // Автоматическое расположение узлов если нужно
+        if (selectedScript != null && selectedScript["result"] != null && selectedScript["result"].HasValues)
         {
-            graphZoom = 1.0f;
-            graphPanOffset = Vector2.zero;
-            return;
+            var nodes = (JArray)selectedScript["result"]["data"];
+            if (nodes != null && nodes.Count > 0 && !HasNodePositions(nodes))
+            {
+                AutoLayoutDAG();
+            }
         }
-
-        // Вычисляем zoom, который поместит весь граф в view
-        var zoomX = graphRect.width / graphBounds.width;
-        var zoomY = graphRect.height / graphBounds.height;
-        graphZoom = Mathf.Min(zoomX, zoomY, 1.0f);
-
-        // Центрируем граф
-        graphPanOffset = new Vector2(
-            (graphRect.width - graphBounds.width * graphZoom) / 2,
-            (graphRect.height - graphBounds.height * graphZoom) / 2
-        );
-
+    
         Repaint();
     }
 
@@ -3334,21 +3621,23 @@ public class PlotTalkAI : EditorWindow
 
     private void ClearEditScriptPageFields()
     {
-        editScriptName = null;
-        editScriptMinMainChar = 0;
-        editScriptMaxMainChar = 0;
-        editScriptMinDepth = 0;
-        editScriptMaxDepth = 0;
+        editScriptName = "";
+        editScriptMinMainChar = 1;
+        editScriptMaxMainChar = 3;
+        editScriptMinDepth = 1;
+        editScriptMaxDepth = 3;
         selectedMainCharacterId = null;
         selectedNPCId = null;
-        editScriptDescription = null;
+        editScriptDescription = "";
         playerGetsInfo = false;
         playerGetsItem = false;
         playerGetsInfoName = "";
         playerGetsItemName = "";
         playerGetsInfoCondition = "";
         playerGetsItemCondition = "";
-        editScriptAdditional = null;
+        editScriptAdditional = "";
+        toMainCharacterRelation = 0;
+        toNpcRelation = 0;
     }
 
     private void ClearEditScenePageFields()
