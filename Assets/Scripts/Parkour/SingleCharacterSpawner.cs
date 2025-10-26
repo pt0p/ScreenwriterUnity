@@ -24,20 +24,20 @@ public class SingleCharacterSpawner : MonoBehaviour
 
     public void Spawn()
     {
-        if (characterPrefabs.Length == 0 || spawnPoint == null) return;
-        int prefabIndex = Random.Range(0, characterPrefabs.Length);
-        GameObject npc = Instantiate(characterPrefabs[prefabIndex], spawnPoint.position, Quaternion.identity);
-        DialogController dc = npc.GetComponent<DialogController>();
-        dc.sceneId = sceneId;
-        dc.dialogLayout = dialogLayout;
-        dc.dialogAnswerPanel = dialogAnswerPanel;
-        dc.dialogLine = dialogLine;
-        dc.dialogAnswerPrefab = dialogAnswerPrefab;
-        dc.dialogName = dialogName;
-        dc.characterPortrait = characterPortrait;
-        dc.characterIcon = characterIcons[prefabIndex];
-        dc.buttonE = buttonE;
-        dc.buttonF = buttonF;
-        dc.itemsDatabase = itemsDatabase;
+        //if (characterPrefabs.Length == 0 || spawnPoint == null) return;
+        //int prefabIndex = Random.Range(0, characterPrefabs.Length);
+        //GameObject npc = Instantiate(characterPrefabs[prefabIndex], spawnPoint.position, Quaternion.identity);
+        //DialogController dc = npc.GetComponent<DialogController>();
+        //dc.sceneId = sceneId;
+        //dc.dialogLayout = dialogLayout;
+        //dc.dialogAnswerPanel = dialogAnswerPanel;
+        //dc.dialogLine = dialogLine;
+        //dc.dialogAnswerPrefab = dialogAnswerPrefab;
+        //dc.dialogName = dialogName;
+        //dc.characterPortrait = characterPortrait;
+        //dc.characterIcon = characterIcons[prefabIndex];
+        //dc.buttonE = buttonE;
+        //dc.buttonF = buttonF;
+        //dc.itemsDatabase = itemsDatabase;
     }
 }
