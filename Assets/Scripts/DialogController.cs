@@ -1,12 +1,12 @@
 ﻿using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.SceneManagement;
+using static DialogApi;
 
 public class DialogController : MonoBehaviour
 {
-    public int sceneId;
+    public string dialogId;
     public bool DialogOpen = false;
 
     public GameObject dialogLayout;
@@ -21,15 +21,15 @@ public class DialogController : MonoBehaviour
     public ItemsDatabase itemsDatabase;
 
     private InventoryManager inventoryManager;
-    private List<MyScene> _scenes;
-    private DialogueNode currentNode;
     private Coroutine currentCoroutine;
     private ParkourEvents parkourEvents;
+    private DialogApi dialogApi;
 
     private void Start()
     {
-        _scenes = FindObjectOfType<Decoder>().MyScenes.scene;
-        currentNode = _scenes[sceneId].data[0];
+        dialogApi = GetInstance();
+        SceneData scene = FindObjectOfType<Decoder>().scene;
+        dialogApi.SetDialog(scene.sceneId, dialogId);
         parkourEvents = FindObjectOfType<ParkourEvents>();
         inventoryManager = FindObjectOfType<InventoryManager>();
     }
@@ -41,26 +41,24 @@ public class DialogController : MonoBehaviour
         return itemsDatabase.items[id];
     }
 
-    private IEnumerator ShowWindow(int id, float delay)
+    private IEnumerator ShowWindow(int phraseId, float delay)
     {
         if (!DialogOpen) yield break;
         yield return new WaitForSeconds(delay);
         if (!DialogOpen) yield break;
-        foreach (Transform child in dialogAnswerPanel.transform) Destroy(child.gameObject);
+        foreach (Transform child in dialogAnswerPanel.transform)
+            Destroy(child.gameObject);
 
-        var scene = _scenes[sceneId];
-        currentNode = scene.data.Find(n => n.id == id);
-
+        var phrase = dialogApi.GetPhrase();
+        if (phrase == null) yield break;
         characterPortrait.sprite = characterIcon;
         characterPortrait.gameObject.SetActive(true);
         dialogLayout.SetActive(true);
-        dialogName.text = scene.npc_name;
-        dialogLine.text = currentNode.line;
-
+        dialogName.text = dialogApi.GetNpcName();
+        dialogLine.text = phrase.text;
         dialogAnswerPanel.SetActive(true);
         Cursor.lockState = CursorLockMode.None;
-
-        if (currentNode.to == null || currentNode.to.Count == 0)
+        if (phrase.variants == null || phrase.variants.Length == 0)
         {
             var btn = Instantiate(dialogAnswerPrefab, dialogAnswerPanel.transform);
             btn.GetComponent<AnswersButtonController>().btnIdx = -2;
@@ -68,11 +66,20 @@ public class DialogController : MonoBehaviour
         }
         else
         {
-            for (int i = 0; i < currentNode.to.Count; i++)
+            for (int i = 0; i < phrase.variants.Length; i++)
             {
+                var variant = phrase.variants[i];
                 var btn = Instantiate(dialogAnswerPrefab, dialogAnswerPanel.transform);
                 btn.GetComponent<AnswersButtonController>().btnIdx = i;
-                btn.transform.GetChild(0).GetComponent<Text>().text = currentNode.to[i].info;
+                string textToShow;
+                if (!string.IsNullOrEmpty(variant.info)) textToShow = variant.info;
+                else
+                {
+                    Debug.LogWarning($"[DialogController] У варианта (id={variant.id}) отсутствует 'info'. " +
+                        "Используется сокращённый вариант 'line'.");
+                    textToShow = GetShortenedLine(variant.line, 6);
+                }
+                btn.transform.GetChild(0).GetComponent<Text>().text = textToShow;
             }
         }
     }
@@ -80,39 +87,42 @@ public class DialogController : MonoBehaviour
     public void ButtonClicked(int id)
     {
         if (!DialogOpen) return;
-        foreach (Transform child in dialogAnswerPanel.transform) Destroy(child.gameObject);
+        foreach (Transform child in dialogAnswerPanel.transform)
+            Destroy(child.gameObject);
         if (id == -2)
         {
             dialogLayout.SetActive(false);
             DialogOpen = false;
             buttonF.SetActive(false);
             buttonE.SetActive(true);
-            currentNode = _scenes[sceneId].data[0];
             Cursor.lockState = CursorLockMode.Locked;
+            dialogApi.SetPhrase(1);
             return;
         }
-
         if (id == -3)
         {
             dialogAnswerPanel.SetActive(false);
             characterPortrait.gameObject.SetActive(true);
             if (currentCoroutine != null) StopCoroutine(currentCoroutine);
-            currentCoroutine = StartCoroutine(ShowWindow(currentNode.id, 0));
+            currentCoroutine = StartCoroutine(ShowWindow(dialogApi.GetPhrase().id, 0));
             return;
         }
-
-        var response = currentNode.to[id];
+        var currentPhrase = dialogApi.GetPhrase();
+        if (currentPhrase == null) return;
+        var variants = currentPhrase.variants;
+        if (variants == null || id < 0 || id >= variants.Length) return;
+        var response = variants[id];
         dialogLine.text = response.line;
-        dialogName.text = _scenes[sceneId].hero_name;
-
-        currentNode = _scenes[sceneId].data.Find(n => n.id == response.id);
-        GoalAchieved goalAchieved = currentNode.goal_achieved;
-        if (goalAchieved.item != -1)
+        dialogName.text = dialogApi.GetMainCharacterName();
+        dialogApi.GetAndApplyVariant(id);
+        var nextPhrase = dialogApi.GetPhrase();
+        if (nextPhrase.itemId != -1)
         {
-            InventoryItem item = GetItemById(goalAchieved.item);
+            InventoryItem item = GetItemById(nextPhrase.itemId);
             if (item != null && !inventoryManager.HasItem(item.name))
             {
-                if (parkourEvents != null) parkourEvents.ShowPart2();
+                if (parkourEvents != null)
+                    parkourEvents.ShowPart2();
                 else
                 {
                     inventoryManager.AddItem(item);
@@ -132,11 +142,9 @@ public class DialogController : MonoBehaviour
                 }
             }
         }
-
         var btnNext = Instantiate(dialogAnswerPrefab, dialogAnswerPanel.transform);
         btnNext.GetComponent<AnswersButtonController>().btnIdx = -3;
         btnNext.transform.GetChild(0).GetComponent<Text>().text = "Продолжить диалог";
-        dialogAnswerPanel.SetActive(true);
         dialogAnswerPanel.SetActive(true);
         characterPortrait.gameObject.SetActive(false);
     }
@@ -156,7 +164,8 @@ public class DialogController : MonoBehaviour
                 StopCoroutine(currentCoroutine);
                 currentCoroutine = null;
             }
-            foreach (Transform child in dialogAnswerPanel.transform) Destroy(child.gameObject);
+            foreach (Transform child in dialogAnswerPanel.transform)
+                Destroy(child.gameObject);
             return;
         }
         if (Input.GetKey(KeyCode.E) && !DialogOpen)
@@ -165,7 +174,7 @@ public class DialogController : MonoBehaviour
             buttonE.SetActive(false);
             buttonF.SetActive(true);
             if (currentCoroutine != null) StopCoroutine(currentCoroutine);
-            currentCoroutine = StartCoroutine(ShowWindow(currentNode.id, 0));
+            currentCoroutine = StartCoroutine(ShowWindow(dialogApi.GetPhrase().id, 0));
         }
     }
 
@@ -177,5 +186,17 @@ public class DialogController : MonoBehaviour
     private void OnTriggerExit(Collider other)
     {
         if (other.CompareTag("Player")) buttonE.SetActive(false);
+    }
+
+    private string GetShortenedLine(string line, int wordLimit = 6)
+    {
+        if (string.IsNullOrWhiteSpace(line))
+            return "...";
+
+        var words = line.Split(' ');
+        if (words.Length <= wordLimit)
+            return line.Trim();
+
+        return string.Join(" ", words, 0, wordLimit) + "...";
     }
 }
