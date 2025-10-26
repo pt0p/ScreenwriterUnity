@@ -56,7 +56,7 @@ public class CanvasSampleOpenFileImage : MonoBehaviour, IPointerDownHandler
             yield return request.SendWebRequest();
             if (request.result == UnityWebRequest.Result.ConnectionError || request.result == UnityWebRequest.Result.ProtocolError)
             {
-                Debug.LogError($"Ошибка загрузки текстуры {url}: {request.error}");
+                Debug.LogError($"РћС€РёР±РєР° Р·Р°РіСЂСѓР·РєРё С‚РµРєСЃС‚СѓСЂС‹ {url}: {request.error}");
             }
             else
             {

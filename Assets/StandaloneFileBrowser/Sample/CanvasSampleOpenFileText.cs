@@ -52,7 +52,7 @@ public class CanvasSampleOpenFileText : MonoBehaviour, IPointerDownHandler {
             yield return request.SendWebRequest();
             if (request.result == UnityWebRequest.Result.ConnectionError || request.result == UnityWebRequest.Result.ProtocolError)
             {
-                Debug.LogError($"Ошибка загрузки {url}: {request.error}");
+                Debug.LogError($"РћС€РёР±РєР° Р·Р°РіСЂСѓР·РєРё {url}: {request.error}");
             }
             else output.text = request.downloadHandler.text;
         }

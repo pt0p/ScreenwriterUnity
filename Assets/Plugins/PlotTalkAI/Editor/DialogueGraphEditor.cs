@@ -1,7 +1,8 @@
-using System;
+п»їusing System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using Plugins.PlotTalkAI.Utils;
 using UnityEditor;
 using UnityEngine;
 using static Codice.CM.Common.CmCallContext;
@@ -31,6 +32,7 @@ public class DialogueGraphEditor : EditorWindow
     [MenuItem("Tools/PlotTalkAI/Dialogue Graph")]
     public static void OpenWindow()
     {
+        Debug.Log(StorageApi.GetInstance().IsLoggedIn());
         var window = GetWindow<DialogueGraphEditor>();
         window.titleContent = new GUIContent("Dialogue Graph");
         window.Show();
@@ -55,18 +57,18 @@ public class DialogueGraphEditor : EditorWindow
             }
         }
         scenes = null;
-        Debug.LogWarning("Граф не загружен. Загрузите JSON вручную.");
+        Debug.LogWarning("Р“СЂР°С„ РЅРµ Р·Р°РіСЂСѓР¶РµРЅ. Р—Р°РіСЂСѓР·РёС‚Рµ JSON РІСЂСѓС‡РЅСѓСЋ.");
     }
 
     private void DrawJsonControls()
     {
         GUILayout.BeginHorizontal(GUILayout.Height(30));
-        if (GUILayout.Button("Загрузить JSON", GUILayout.Width(140))) LoadFromJson();
+        if (GUILayout.Button("Р—Р°РіСЂСѓР·РёС‚СЊ JSON", GUILayout.Width(140))) LoadFromJson();
         GUI.enabled = !string.IsNullOrEmpty(jsonPath);
-        if (GUILayout.Button("Сохранить JSON", GUILayout.Width(140))) SaveToJson();
+        if (GUILayout.Button("РЎРѕС…СЂР°РЅРёС‚СЊ JSON", GUILayout.Width(140))) SaveToJson();
         GUI.enabled = true;
         GUILayout.FlexibleSpace();
-        if (!string.IsNullOrEmpty(jsonPath)) GUILayout.Label($"Файл: {Path.GetFileName(jsonPath)}", EditorStyles.miniLabel);
+        if (!string.IsNullOrEmpty(jsonPath)) GUILayout.Label($"Р¤Р°Р№Р»: {Path.GetFileName(jsonPath)}", EditorStyles.miniLabel);
         GUILayout.EndHorizontal();
         EditorGUILayout.Space(5);
     }
@@ -256,8 +258,8 @@ public class DialogueGraphEditor : EditorWindow
             float spacing = 8f;
             Rect okButtonRect = new Rect(textAreaRect.x + nodeWidth + spacing, textAreaRect.y, buttonWidth + 20f, buttonHeight);
             Rect cancelButtonRect = new Rect(okButtonRect.x, okButtonRect.y + buttonHeight + spacing, buttonWidth, buttonHeight);
-            if (GUI.Button(okButtonRect, "Сохранить")) ApplyEditing();
-            if (GUI.Button(cancelButtonRect, "Отмена")) CancelEditing();
+            if (GUI.Button(okButtonRect, "РЎРѕС…СЂР°РЅРёС‚СЊ")) ApplyEditing();
+            if (GUI.Button(cancelButtonRect, "РћС‚РјРµРЅР°")) CancelEditing();
             if (editingNode != null)
             {
                 float fieldsY = cancelButtonRect.y + buttonHeight + spacing;
@@ -268,7 +270,7 @@ public class DialogueGraphEditor : EditorWindow
                     fieldWidth,
                     buttonHeight
                 );
-                GUI.Label(itemLabelRect, "Предмет (ID):");
+                GUI.Label(itemLabelRect, "РџСЂРµРґРјРµС‚ (ID):");
                 Rect itemFieldRect = new Rect(
                     okButtonRect.x,
                     fieldsY + buttonHeight,
@@ -282,7 +284,7 @@ public class DialogueGraphEditor : EditorWindow
                     fieldWidth,
                     buttonHeight
                 );
-                GUI.Label(infoLabelRect, "Информация:");
+                GUI.Label(infoLabelRect, "РРЅС„РѕСЂРјР°С†РёСЏ:");
                 Rect infoFieldRect = new Rect(
                     okButtonRect.x,
                     fieldsY + buttonHeight * 3 + spacing,
@@ -298,7 +300,7 @@ public class DialogueGraphEditor : EditorWindow
                         fieldWidth,
                         buttonHeight
                     );
-                    GUI.Label(hintRect, "( -1 = ничего )", EditorStyles.miniLabel);
+                    GUI.Label(hintRect, "( -1 = РЅРёС‡РµРіРѕ )", EditorStyles.miniLabel);
                 }
             }
             return;
@@ -307,7 +309,7 @@ public class DialogueGraphEditor : EditorWindow
 
     private void LoadFromJson()
     {
-        string path = EditorUtility.OpenFilePanel("Загрузить файл", "", "json");
+        string path = EditorUtility.OpenFilePanel("Р—Р°РіСЂСѓР·РёС‚СЊ С„Р°Р№Р»", "", "json");
         if (!string.IsNullOrEmpty(path))
         {
             string json = File.ReadAllText(path);
@@ -318,9 +320,9 @@ public class DialogueGraphEditor : EditorWindow
                 jsonPath = path;
                 EditorPrefs.SetString(JsonPathKey, path);
                 Repaint();
-                Debug.Log("Загружено: " + path);
+                Debug.Log("Р—Р°РіСЂСѓР¶РµРЅРѕ: " + path);
             }
-            else Debug.LogError("Не удалось распарсить JSON как список сцен.");
+            else Debug.LogError("РќРµ СѓРґР°Р»РѕСЃСЊ СЂР°СЃРїР°СЂСЃРёС‚СЊ JSON РєР°Рє СЃРїРёСЃРѕРє СЃС†РµРЅ.");
         }
     }
 
@@ -338,7 +340,7 @@ public class DialogueGraphEditor : EditorWindow
     {
         if (string.IsNullOrEmpty(jsonPath))
         {
-            Debug.LogWarning("Файл не выбран. Сначала загрузите или выберите файл.");
+            Debug.LogWarning("Р¤Р°Р№Р» РЅРµ РІС‹Р±СЂР°РЅ. РЎРЅР°С‡Р°Р»Р° Р·Р°РіСЂСѓР·РёС‚Рµ РёР»Рё РІС‹Р±РµСЂРёС‚Рµ С„Р°Р№Р».");
             return;
         }
         string rawJson = JsonUtility.ToJson(new SceneListWrapper<MyScene>(scenes.scene), true);
@@ -351,10 +353,10 @@ public class DialogueGraphEditor : EditorWindow
             {
                 string json = rawJson.Substring(start, end - start + 1);
                 File.WriteAllText(jsonPath, json);
-                Debug.Log("Сохранено в: " + jsonPath);
+                Debug.Log("РЎРѕС…СЂР°РЅРµРЅРѕ РІ: " + jsonPath);
                 return;
             }
         }
-        Debug.LogError("Не удалось сохранить JSON: структура повреждена.");
+        Debug.LogError("РќРµ СѓРґР°Р»РѕСЃСЊ СЃРѕС…СЂР°РЅРёС‚СЊ JSON: СЃС‚СЂСѓРєС‚СѓСЂР° РїРѕРІСЂРµР¶РґРµРЅР°.");
     }
 }
