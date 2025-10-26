@@ -4780,6 +4780,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 26f71c27f0304f842b89f22cc68ecc31, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  sceneId: 1758134675
 --- !u!4 &313761857
 Transform:
   m_ObjectHideFlags: 0
@@ -29682,9 +29683,9 @@ MonoBehaviour:
   - {fileID: 21300000, guid: 3307a31e1c286a24a80847d5eb272687, type: 3}
   - {fileID: 21300000, guid: 421e22632e3ff134484c1e69b217821a, type: 3}
   - {fileID: 21300000, guid: bffb0a1042648654a84947e665990be6, type: 3}
-  spawnHeight: 0.6
-  minDistanceCTC: 9
-  checkRadius: 3
+  spawnHeight: 0.61
+  minDistanceCTC: 10
+  checkRadius: 5
   dialogLayout: {fileID: 505836167}
   dialogAnswerPanel: {fileID: 823368348}
   characterPortrait: {fileID: 549720009}

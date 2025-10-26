@@ -12,7 +12,7 @@ public class CharacterGenerator : MonoBehaviour
     [SerializeField] private float minDistanceCTC = 10f;
     [SerializeField] private float checkRadius = 5f;
 
-    [Header("Dialog UI")]
+    [Header("Dialogue UI")]
     [SerializeField] private GameObject dialogLayout;
     [SerializeField] private GameObject dialogAnswerPanel;
     [SerializeField] private Image characterPortrait;
@@ -24,17 +24,18 @@ public class CharacterGenerator : MonoBehaviour
     [SerializeField] private ItemsDatabase itemsDatabase;
 
     private BoxCollider _spawnArea;
-    private int _sceneCount;
+    private int _dialogCount;
     private List<Vector3> characterPositions = new List<Vector3>();
 
     void Start()
     {
-        List<MyScene> scenes = FindObjectOfType<Decoder>().MyScenes.scene;
-        _sceneCount = scenes.Count;
+        SceneData scene = FindObjectOfType<Decoder>().scene;
+        List<DialogData> dialogs = scene.dialogs;
+        _dialogCount = dialogs.Count;
         _spawnArea = GetComponent<BoxCollider>();
         Vector3 maxSpawnPos = new Vector3(_spawnArea.size.x / 2, _spawnArea.size.y / 2, _spawnArea.size.z / 2);
 
-        for (int i = 0; i < _sceneCount; i++)
+        for (int i = 0; i < _dialogCount; i++)
         {
             int prefabIndex = Random.Range(0, characterPrefabs.Length);
             Vector3 characterPos;
@@ -62,7 +63,7 @@ public class CharacterGenerator : MonoBehaviour
                         new Vector2(characterPos.x, characterPos.z),
                         new Vector2(existing.x, existing.z)
                     );
-                    return distance >= minDistanceCTC / _sceneCount;
+                    return distance >= minDistanceCTC / _dialogCount;
                 }) && noBuildingCollision;
 
             } while (!validPosition);
@@ -72,7 +73,7 @@ public class CharacterGenerator : MonoBehaviour
             spawned.transform.parent = transform;
             spawned.transform.localPosition = characterPos;
             DialogController dc = spawned.GetComponent<DialogController>();
-            dc.sceneId = i;
+            dc.dialogId = dialogs[i].id;
             dc.dialogLayout = dialogLayout;
             dc.dialogAnswerPanel = dialogAnswerPanel;
             dc.dialogLine = dialogLine;
