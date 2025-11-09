@@ -9,8 +9,8 @@ namespace Plugins.PlotTalkAI.Utils
 {
     public static class BackendApi
     {
-        private const string BASE_URL = "http://localhost:8005";
-        
+        private const string BASE_URL = "https://plottalkai-backend.onrender.com";
+
         [System.Serializable]
         private class LoginRequest
         {
