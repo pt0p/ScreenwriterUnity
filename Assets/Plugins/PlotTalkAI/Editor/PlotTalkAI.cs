@@ -1402,7 +1402,7 @@ public class PlotTalkAI : EditorWindow
         GUILayout.Space(5);
 
         if (GUILayout.Button("Сохранить", buttonStyle, GUILayout.Height(40)))
-        {
+        { 
             if (!string.IsNullOrEmpty(editSceneDescription) && !string.IsNullOrEmpty(editSceneName) &&
                 editSceneCharacters.Count > 0)
             {
@@ -2498,7 +2498,7 @@ public class PlotTalkAI : EditorWindow
                         
                         // Сохраняем токен и ID пользователя, заменяем только данные
                         var currentUser = fullJson["user"];
-                        currentUser["data"] = serverData;
+                        currentUser["data"] = serverData["data"];
                         
                         // Сохраняем обновленный файл
                         StorageApi.GetInstance().SetDataString(StorageApi.Serialize(fullJson));
