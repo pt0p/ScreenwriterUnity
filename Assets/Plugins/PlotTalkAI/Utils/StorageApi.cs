@@ -137,21 +137,33 @@ namespace Plugins.PlotTalkAI.Utils
             if (IsLoggedIn())
             {
                 Debug.LogError("User already logged in");
+                return;
             }
 
-            // Устанавливаем токен в BackendApi
             BackendApi.SetCurrentToken(userToken);
 
-            // Парсим userDataString чтобы убедиться в валидности JSON
             try
             {
                 JObject userData = JObject.Parse(userDataString);
-                SetDataString("{ \"user\": {\"id\":" + userId + ",\"token\":\"" + userToken + "\",\"data\":" + userDataString + "} }");
+        
+                var loginData = new JObject
+                {
+                    ["id"] = userId,
+                    ["token"] = userToken
+                };
+        
+                // Мерджим все поля из userData в корень
+                loginData.Merge(userData, new JsonMergeSettings 
+                {
+                    MergeArrayHandling = MergeArrayHandling.Replace
+                });
+
+                SetDataString("{ \"user\": " + loginData.ToString() + " }");
             }
             catch (Exception e)
             {
                 Debug.LogError($"Invalid user data JSON: {e.Message}");
-                // Если невалидный JSON, сохраняем как есть
+                // Fallback
                 SetDataString("{ \"user\": {\"id\":" + userId + ",\"token\":\"" + userToken + "\",\"data\":" + userDataString + "} }");
             }
         }
