@@ -45,6 +45,7 @@ public class PlotTalkAI : EditorWindow
     private GUIStyle iconButtonStyle;
     private GUIStyle fieldLabelStyle;
     private GUIStyle textFieldStyle;
+    private GUIStyle textAreaStyle;
     private GUIStyle zoomLabelStyle;
 
 
@@ -265,6 +266,11 @@ public class PlotTalkAI : EditorWindow
         fontSize = 24,
         fontStyle = FontStyle.Bold,
         normal = { textColor = textColor },
+        wordWrap = true
+    };
+
+    textAreaStyle = new GUIStyle(EditorStyles.textArea)
+    {
         wordWrap = true
     };
 
@@ -728,8 +734,7 @@ public class PlotTalkAI : EditorWindow
         GUILayout.Space(15);
 
         GUILayout.Label("Характеристики мира", fieldLabelStyle);
-        editGameDescription = EditorGUILayout.TextArea(editGameDescription,
-            GUILayout.Height(60)); // Фиксированная высота для текстового поля
+        editGameDescription = EditorGUILayout.TextArea(editGameDescription, textAreaStyle); // Фиксированная высота для текстового поля
         GUILayout.Space(5);
         editGameGenre = EditorGUILayout.Popup("Жанр", editGameGenre, gameGenres);
         GUILayout.Space(5);
@@ -911,20 +916,17 @@ public class PlotTalkAI : EditorWindow
         GUILayout.Space(15);
 
         GUILayout.Label("Стиль речи", fieldLabelStyle);
-        editCharacterTalkStyle = EditorGUILayout.TextArea(editCharacterTalkStyle,
-            GUILayout.Height(60));
+        editCharacterTalkStyle = EditorGUILayout.TextArea(editCharacterTalkStyle, textAreaStyle);
 
         GUILayout.Space(15);
 
         GUILayout.Label("Внешний вид", fieldLabelStyle);
-        editCharacterLook = EditorGUILayout.TextArea(editCharacterLook,
-            GUILayout.Height(60));
+        editCharacterLook = EditorGUILayout.TextArea(editCharacterLook, textAreaStyle);
 
         GUILayout.Space(15);
 
         GUILayout.Label("Характеристика", fieldLabelStyle);
-        editCharacterExtra = EditorGUILayout.TextArea(editCharacterExtra,
-            GUILayout.Height(60)); // Фиксированная высота для текстового поля
+        editCharacterExtra = EditorGUILayout.TextArea(editCharacterExtra, textAreaStyle); // Фиксированная высота для текстового поля
 
         GUILayout.Space(15);
 
@@ -1360,8 +1362,7 @@ public class PlotTalkAI : EditorWindow
         GUILayout.Space(15);
 
         GUILayout.Label("Характеристики сцены", fieldLabelStyle);
-        editSceneDescription = EditorGUILayout.TextArea(editSceneDescription,
-            GUILayout.Height(60)); // Фиксированная высота для текстового поля
+        editSceneDescription = EditorGUILayout.TextArea(editSceneDescription, textAreaStyle); // Фиксированная высота для текстового поля
 
         GUILayout.Space(15);
 
@@ -1600,7 +1601,7 @@ public class PlotTalkAI : EditorWindow
         GUILayout.Space(15);
         GUILayout.Label("Краткое содержание", centeredSmallLabelStyle);
         GUILayout.Space(15);
-        editScriptDescription = EditorGUILayout.TextArea(editScriptDescription, GUILayout.Height(60));
+        editScriptDescription = EditorGUILayout.TextArea(editScriptDescription, textAreaStyle);
         GUILayout.Space(30);
 
         // Сохраняем предыдущие значения перед изменением
@@ -1656,7 +1657,7 @@ public class PlotTalkAI : EditorWindow
         GUILayout.Space(30);
         GUILayout.Label("Дополнительно", centeredSmallLabelStyle);
         GUILayout.Space(15);
-        editScriptAdditional = EditorGUILayout.TextArea(editScriptAdditional, GUILayout.Height(60));
+        editScriptAdditional = EditorGUILayout.TextArea(editScriptAdditional, textAreaStyle);
 
         GUILayout.Space(15);
 
@@ -2105,15 +2106,9 @@ public class PlotTalkAI : EditorWindow
         GUILayout.Label("Текст реплики:", labelStyle);
         GUILayout.Space(5);
 
-        // TextArea с запретом горизонтальной прокрутки
-        var textAreaStyle = new GUIStyle(EditorStyles.textArea)
-        {
-            wordWrap = true // Запрещаем горизонтальную прокрутку, включая перенос слов
-        };
-
         editingNodeScroll = GUILayout.BeginScrollView(editingNodeScroll, GUIStyle.none, GUI.skin.verticalScrollbar,
             GUILayout.Height(100));
-        nodeEditText = EditorGUILayout.TextArea(nodeEditText, textAreaStyle, GUILayout.ExpandHeight(true));
+        nodeEditText = EditorGUILayout.TextArea(nodeEditText, textAreaStyle);
         GUILayout.EndScrollView();
 
         GUILayout.Space(10);
@@ -2216,19 +2211,13 @@ public class PlotTalkAI : EditorWindow
             normal = { textColor = EditorGUIUtility.isProSkin ? Color.white : Color.black }
         };
 
-        // Стиль для TextArea с запретом горизонтальной прокрутки
-        var textAreaStyle = new GUIStyle(EditorStyles.textArea)
-        {
-            wordWrap = true // Запрещаем горизонтальную прокрутку, включая перенос слов
-        };
-
         GUILayout.Label("Текст реплики:", labelStyle);
         GUILayout.Space(5);
 
         // TextArea с запретом горизонтальной прокрутки
         linkEditorScroll = GUILayout.BeginScrollView(linkEditorScroll, GUIStyle.none, GUI.skin.verticalScrollbar,
             GUILayout.Height(80));
-        lineEditText = EditorGUILayout.TextArea(lineEditText, textAreaStyle, GUILayout.ExpandHeight(true));
+        lineEditText = EditorGUILayout.TextArea(lineEditText, textAreaStyle);
         GUILayout.EndScrollView();
 
         GUILayout.Space(10);
@@ -2238,7 +2227,7 @@ public class PlotTalkAI : EditorWindow
         // Второй TextArea с запретом горизонтальной прокрутки
         lineEditInfoScroll = GUILayout.BeginScrollView(lineEditInfoScroll, GUIStyle.none, GUI.skin.verticalScrollbar,
             GUILayout.Height(80));
-        lineEditInfo = EditorGUILayout.TextArea(lineEditInfo, textAreaStyle, GUILayout.ExpandHeight(true));
+        lineEditInfo = EditorGUILayout.TextArea(lineEditInfo, textAreaStyle);
         GUILayout.EndScrollView();
 
         GUILayout.Space(15);
