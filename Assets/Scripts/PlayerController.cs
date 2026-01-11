@@ -61,7 +61,10 @@ public class PlayerController : MonoBehaviour
         {
             Vector3 finalMove = moveDirection + slidingForce;
             finalMove.y = _verticalVelocity;
-            finalMove += externalPlatformMotion / Time.deltaTime;
+            if (Time.deltaTime > 0f)
+            {
+                finalMove += externalPlatformMotion / Time.deltaTime;
+            }
             _cc.Move(finalMove * Time.deltaTime);
             externalPlatformMotion = Vector3.zero;
             slidingForce = Vector3.zero;
