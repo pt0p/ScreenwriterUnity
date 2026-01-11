@@ -1,11 +1,13 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using Newtonsoft.Json.Linq;
 using UnityEngine;
 
 public class DialogApi
 {
+    private const string DialogJsonPathKey = "DialogJsonPath";
     private static DialogApi _instance;
     private List<Phrase> _phrases = new List<Phrase>();
     private Phrase _currentPhrase;
@@ -17,6 +19,21 @@ public class DialogApi
 
     private DialogApi() { }
 
+    private static string LoadDialogJson(string sceneId)
+    {
+        string customPath = PlayerPrefs.GetString(DialogJsonPathKey, string.Empty);
+        if (!string.IsNullOrEmpty(customPath) && File.Exists(customPath))
+        {
+            return File.ReadAllText(customPath);
+        }
+
+        string path = $"dialogues/{sceneId}";
+        TextAsset asset = Resources.Load<TextAsset>(path);
+        if (asset == null)
+            throw new InvalidOperationException($"Р¤Р°Р№Р» РЅРµ РЅР°Р№РґРµРЅ: Resources/{path}.json");
+        return asset.text;
+    }
+
     public static DialogApi GetInstance()
     {
         if (_instance == null)
@@ -24,24 +41,21 @@ public class DialogApi
         return _instance;
     }
 
-    /// Загружает файл сцены и выбирает диалог по id.
+    /// Р—Р°РіСЂСѓР¶Р°РµС‚ С„Р°Р№Р» СЃС†РµРЅС‹ Рё РІС‹Р±РёСЂР°РµС‚ РґРёР°Р»РѕРі РїРѕ id.
     public void SetDialog(string sceneId, string dialogId)
     {
-        string path = $"dialogues/{sceneId}";
-        TextAsset asset = Resources.Load<TextAsset>(path);
-        if (asset == null)
-            throw new InvalidOperationException($"Файл не найден: Resources/{path}.json");
-        var dialogs = JArray.Parse(asset.text);
+        string jsonText = LoadDialogJson(sceneId);
+        var dialogs = JArray.Parse(jsonText);
         var dialog = dialogs.FirstOrDefault(d => d.Value<string>("id") == dialogId);
         if (dialog == null)
-            throw new ArgumentException($"Диалог с id={dialogId} не найден в файле {sceneId}.json");
+            throw new ArgumentException($"Р”РёР°Р»РѕРі СЃ id={dialogId} РЅРµ РЅР°Р№РґРµРЅ РІ С„Р°Р№Р»Рµ {sceneId}.json");
         _dialogId = dialogId;
         _npcName = dialog.Value<string>("npc_name") ?? "???";
         _heroName = dialog.Value<string>("hero_name") ?? "???";
         _phrases.Clear();
         var dataArray = dialog["data"] as JArray;
         if (dataArray == null)
-            throw new FormatException($"В диалоге {dialogId} отсутствует поле 'data'.");
+            throw new FormatException($"Р’ РґРёР°Р»РѕРіРµ {dialogId} РѕС‚СЃСѓС‚СЃС‚РІСѓРµС‚ РїРѕР»Рµ 'data'.");
         foreach (var node in dataArray)
         {
             var phrase = new Phrase
@@ -75,37 +89,37 @@ public class DialogApi
     private void EnsureDialogLoaded()
     {
         if (!_dialogLoaded)
-            throw new InvalidOperationException("Диалог не загружен. Вызовите SetDialog() перед использованием API.");
+            throw new InvalidOperationException("Р”РёР°Р»РѕРі РЅРµ Р·Р°РіСЂСѓР¶РµРЅ. Р’С‹Р·РѕРІРёС‚Рµ SetDialog() РїРµСЂРµРґ РёСЃРїРѕР»СЊР·РѕРІР°РЅРёРµРј API.");
     }
 
-    /// Возвращает текущую фразу.
+    /// Р’РѕР·РІСЂР°С‰Р°РµС‚ С‚РµРєСѓС‰СѓСЋ С„СЂР°Р·Сѓ.
     public Phrase GetPhrase()
     {
         EnsureDialogLoaded();
         return _currentPhrase;
     }
 
-    /// Устанавливает текущую фразу по её id.
+    /// РЈСЃС‚Р°РЅР°РІР»РёРІР°РµС‚ С‚РµРєСѓС‰СѓСЋ С„СЂР°Р·Сѓ РїРѕ РµС‘ id.
     public void SetPhrase(int id)
     {
         EnsureDialogLoaded();
         _currentPhrase = _phrases.Find(p => p.id == id)
-            ?? throw new ArgumentException($"Фраза с id={id} не найдена в диалоге {_dialogId}.");
+            ?? throw new ArgumentException($"Р¤СЂР°Р·Р° СЃ id={id} РЅРµ РЅР°Р№РґРµРЅР° РІ РґРёР°Р»РѕРіРµ {_dialogId}.");
     }
 
-    /// Применяет выбранный вариант ответа и переходит к следующей фразе.
+    /// РџСЂРёРјРµРЅСЏРµС‚ РІС‹Р±СЂР°РЅРЅС‹Р№ РІР°СЂРёР°РЅС‚ РѕС‚РІРµС‚Р° Рё РїРµСЂРµС…РѕРґРёС‚ Рє СЃР»РµРґСѓСЋС‰РµР№ С„СЂР°Р·Рµ.
     public string GetAndApplyVariant(int variant)
     {
         EnsureDialogLoaded();
         if (_currentPhrase == null || _currentPhrase.variants == null || variant >= _currentPhrase.variants.Length)
             throw new ArgumentOutOfRangeException(nameof(variant),
-                $"Неверный индекс варианта: {variant}. Допустимо: 0..{_currentPhrase.variants.Length - 1}");
+                $"РќРµРІРµСЂРЅС‹Р№ РёРЅРґРµРєСЃ РІР°СЂРёР°РЅС‚Р°: {variant}. Р”РѕРїСѓСЃС‚РёРјРѕ: 0..{_currentPhrase.variants.Length - 1}");
         var selected = _currentPhrase.variants[variant];
         SetPhrase(selected.nextNodeId);
         return selected.line;
     }
 
-    /// Переходит к следующей фразе.
+    /// РџРµСЂРµС…РѕРґРёС‚ Рє СЃР»РµРґСѓСЋС‰РµР№ С„СЂР°Р·Рµ.
     public void NextPhrase()
     {
         EnsureDialogLoaded();
@@ -115,14 +129,14 @@ public class DialogApi
             SetPhrase(_phrases[currentIndex + 1].id);
     }
 
-    /// Возвращает имя главного персонажа.
+    /// Р’РѕР·РІСЂР°С‰Р°РµС‚ РёРјСЏ РіР»Р°РІРЅРѕРіРѕ РїРµСЂСЃРѕРЅР°Р¶Р°.
     public string GetMainCharacterName()
     {
         EnsureDialogLoaded();
         return _heroName;
     }
 
-    /// Возвращает имя NPC.
+    /// Р’РѕР·РІСЂР°С‰Р°РµС‚ РёРјСЏ NPC.
     public string GetNpcName()
     {
         EnsureDialogLoaded();
