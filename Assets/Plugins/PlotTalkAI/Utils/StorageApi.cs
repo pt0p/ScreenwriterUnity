@@ -19,8 +19,7 @@ namespace Plugins.PlotTalkAI.Utils
 
         public static StorageApi GetInstance()
         {
-            _jsonDir ??= Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
-                "PlotTalkAI");
+            _jsonDir ??= Path.Combine(Application.persistentDataPath, "PlotTalkAI");
             _jsonPath ??= Path.Combine(_jsonDir, "users.json");
             return _instance ??= new StorageApi();
         }
