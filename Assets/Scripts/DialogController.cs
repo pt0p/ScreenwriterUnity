@@ -32,6 +32,28 @@ public class DialogController : MonoBehaviour
         dialogApi.SetDialog(scene.sceneId, dialogId);
         parkourEvents = FindObjectOfType<ParkourEvents>();
         inventoryManager = FindObjectOfType<InventoryManager>();
+        ConfigureDialogLayout();
+    }
+
+    private void ConfigureDialogLayout()
+    {
+        if (dialogLayout == null) return;
+
+        DisableVerticalFit(dialogLayout);
+
+        var dialogPanel = dialogLayout.transform.Find("DialogPanel");
+        if (dialogPanel != null)
+            DisableVerticalFit(dialogPanel.gameObject);
+
+        if (dialogAnswerPanel != null)
+            DisableVerticalFit(dialogAnswerPanel);
+    }
+
+    private void DisableVerticalFit(GameObject target)
+    {
+        var fitter = target.GetComponent<ContentSizeFitter>();
+        if (fitter != null)
+            fitter.verticalFit = ContentSizeFitter.FitMode.Unconstrained;
     }
 
     private InventoryItem GetItemById(int id)
