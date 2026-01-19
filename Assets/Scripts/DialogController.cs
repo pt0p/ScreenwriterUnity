@@ -2,7 +2,6 @@
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.SceneManagement;
-using static DialogApi;
 
 public class DialogController : MonoBehaviour
 {
@@ -27,7 +26,7 @@ public class DialogController : MonoBehaviour
 
     private void Start()
     {
-        dialogApi = GetInstance();
+        dialogApi = new DialogApi();
         SceneData scene = FindObjectOfType<Decoder>().scene;
         dialogApi.SetDialog(scene.sceneId, dialogId);
         parkourEvents = FindObjectOfType<ParkourEvents>();
