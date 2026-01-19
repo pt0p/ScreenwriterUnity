@@ -8,7 +8,6 @@ using UnityEngine;
 public class DialogApi
 {
     private const string DialogJsonPathKey = "DialogJsonPath";
-    private static DialogApi _instance;
     private List<Phrase> _phrases = new List<Phrase>();
     private Phrase _currentPhrase;
 
@@ -17,7 +16,7 @@ public class DialogApi
     private bool _dialogLoaded = false;
     private string _dialogId;
 
-    private DialogApi() { }
+    public DialogApi() { }
 
     private static string LoadDialogJson(string sceneId)
     {
@@ -32,13 +31,6 @@ public class DialogApi
         if (asset == null)
             throw new InvalidOperationException($"Файл не найден: Resources/{path}.json");
         return asset.text;
-    }
-
-    public static DialogApi GetInstance()
-    {
-        if (_instance == null)
-            _instance = new DialogApi();
-        return _instance;
     }
 
     /// Загружает файл сцены и выбирает диалог по id.
