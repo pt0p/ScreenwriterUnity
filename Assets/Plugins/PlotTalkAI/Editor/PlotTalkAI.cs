@@ -548,7 +548,10 @@ public class PlotTalkAI : EditorWindow
     private void DrawMainPage()
     {
         var games = StorageApi.GetInstance().GetGamesArray(StorageApi.GetInstance().LoadFullJson());
-        GUILayout.Label($"Добро пожаловать, {StorageApi.GetInstance().GetUser()?["data"]?["name"] ?? "Ошибка получения имени"} {StorageApi.GetInstance().GetUser()?["data"]?["surname"] ?? "Ошибка получения фамилии"}!", centeredLabelStyle);
+        var user = StorageApi.GetInstance().GetUser();
+        var userName = user?["name"] ?? user?["data"]?["name"];
+        var userSurname = user?["surname"] ?? user?["data"]?["surname"];
+        GUILayout.Label($"Добро пожаловать, {userName ?? "Ошибка получения имени"} {userSurname ?? "Ошибка получения фамилии"}!", centeredLabelStyle);
         GUILayout.Space(30);
 
         // Рассчитываем доступную ширину с учетом полосы прокрутки
